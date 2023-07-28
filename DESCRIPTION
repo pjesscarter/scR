@@ -15,3 +15,7 @@ BugReports: https://github.com/pjesscarter/scR/issues
 Imports: 
     parallel,
     pbapply
+Suggests: 
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr

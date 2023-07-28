@@ -73,8 +73,4 @@ risk_bounds <- function(model,dim,packages,m=1000,k=1000,maxn=5000,coreoffset=0,
   vcd <- optim((l+1),loss,ngrid=ngrid,xi=xihats,method="Brent",lower=1,upper = 2*(max(ngrid)))
   return(vcd$par)
 }
-#Test function
-risk_bounds(model=randomForest,dim=20,m=100,k=100,maxn=500,packages= list("randomForest"))
 
-
-##For application

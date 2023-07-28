@@ -1,0 +1,19 @@
+---
+title: "recidivism"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{recidivism}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+This
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(scR)
+```
