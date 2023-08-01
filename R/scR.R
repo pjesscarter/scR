@@ -1,7 +1,7 @@
 #Does not need to be user-facing
 #Works for any function that uses formula+data interface
 #TODO - add support for custom helper function to prepare data for use
-simvcd <- function(x,...){
+risk_bounds <- function(x,...){
   n <- x
   xis <- vector()
   for(j in 1:m){
@@ -39,13 +39,10 @@ simvcd <- function(x,...){
   xihat <- mean(xis)
   return(xihat)
 }
-loss <- function(h,ngrid,xi){
+loss <- function(h,ngrid,xi,a=0.16,a1=1.2,a11=0.14927){
   #These constants are calculated in Vapnik, Levin and Le Cun 1994
   #based on the known VC dimension of linear discriminant functions 
   #and rely on the assumption that they are universal for all classifiers
-  a <- 0.16
-  a1 <- 1.2
-  a11 <- 0.14927
   ratio <- ngrid/h
   phi <- a*((log((2*ratio))+1)/(ratio-a11))*(1+sqrt((1+((a1*(ratio - a11))/(1+log(2*ratio))))))
   test <- ngrid < (h/2)
@@ -57,7 +54,7 @@ loss <- function(h,ngrid,xi){
 }
 
 #Note - make parallelization optionally removable
-risk_bounds <- function(model,dim,packages,m=1000,k=1000,maxn=5000,coreoffset=0,...){
+simvcd <- function(model,dim,packages,m=1000,k=1000,maxn=5000,coreoffset=0, ...){
   ngrid <- seq(dim,maxn,(maxn/k))
   cl <- detectCores() -coreoffset
   cl <- makeCluster(cl)
@@ -68,9 +65,9 @@ risk_bounds <- function(model,dim,packages,m=1000,k=1000,maxn=5000,coreoffset=0,
     lapply(packages, library, character.only = TRUE)
   })
   #Need to work on passing function arguments with pbapply - some issues around parallelization
-  xihats <- pbsapply(ngrid,simvcd,...,cl=cl)
+  xihats <- suppressWarnings({pbsapply(ngrid,risk_bounds,...,cl=cl)})
   stopCluster(cl)
-  vcd <- optim((l+1),loss,ngrid=ngrid,xi=xihats,method="Brent",lower=1,upper = 2*(max(ngrid)))
+  vcd <- optim((l+1),loss,ngrid=ngrid,xi=xihats,method="Brent",lower=1,upper = 2*(max(ngrid)), ...)
   return(vcd$par)
 }
 

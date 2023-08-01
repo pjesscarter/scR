@@ -17,3 +17,18 @@ knitr::opts_chunk$set(
 ```{r setup}
 library(scR)
 ```
+
+# Simulating VC Dimension
+
+The `simvcd()` function provides a simulation-based method for estimating the vcd dimension of any estimation algorithm. This function relies on two helper functions, `risk_bounds()` and `loss`, also included in the package, which provide estimates of the empirical risk for a given $n$ and define the sum of squares to be minimized, respectively. In the current version of the package, the estimation algorithm must follow the syntax of taking a `formula` object and rectangular `data.frame` as input and generating a binary factor variable as output. Future versions will support other common formats, as well as the provision of user-defined helper functions for other cases. Examples of common use cases are included in this vignette. 
+
+In order to estimate the VC dimension for a given model, the user should provide the model (along with a `list` of any packages that need to be loaded), along with its dimension (i.e. the number of predictor variables) and simulation parameters $m,k,N$, which govern the number of simulations at each design point, the number of design points, and the maximum sample size, respectively. Note that consistency requires that all three of these parameters approach infinity, so that users must choose between computation time and the accuracy of the approximation. Below is an example of estimating the VC dimension for a small (2-variable) random forest using the default parameters. 
+
+```{r}
+library(randomForest)
+#simvcd(model=randomForest,dim=2,m=100,k=100,maxn=500,packages= list("randomForest"))
+```
+
+# Replication example: Predicting Recidivism
+
+In 
