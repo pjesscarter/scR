@@ -48,7 +48,7 @@ mypred <- function(m,newdata){
   out <- factor(ifelse(out>0.5,1,0),levels=c("0","1")) #Important - must specify levels to account for possibility of all observations being classified into the same class in smaller samples
   return(out)
 }
-simvcd(model=mylogit,dim=7,m=100,k=100,maxn=500,predictfn = mypred)
+simvcd(model=mylogit,dim=7,m=1000,k=1000,maxn=5000,predictfn = mypred) #Takes about 20 minutes to run on mid-range test machine (Intel i5-11600K CPU)
 ```
 
 # Works Cited

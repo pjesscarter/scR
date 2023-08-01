@@ -73,4 +73,13 @@ simvcd <- function(model,dim,packages=NULL,m=1000,k=1000,maxn=5000,coreoffset=0,
   vcd <- optim((l+1),loss,ngrid=ngrid,xi=xihats,method="Brent",lower=1,upper = 2*(max(ngrid)), ...)
   return(vcd$par)
 }
+scb <- function(vcd=NULL,epsilon=NULL,delta=NULL,eta=NULL,theor=TRUE,...){
+  if(!theor){
+    vc <- simvcd(...) #Pass extra args to the simvcd function if theoretical value is unknown
+  } else{
+    vc <- vcd
+  }
+  m <- (1/((epsilon)*((1-2*eta)^2)))*(vc + log(1/delta))
+  return(ceiling(m))
+}
 
