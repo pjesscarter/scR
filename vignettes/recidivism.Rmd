@@ -31,4 +31,26 @@ library(randomForest)
 
 # Replication example: Predicting Recidivism
 
-In 
+In "The accuracy, fairness, and limits of predicting recidivism", Dressel and Farid (2018) use logistic regression to predict recidivism using an abridged list of 7 features. The replication data from their paper is included with the `scR` package. Here, we demonstrate how our method can be applied to this case in order to produce an estimate of the required sample size necessary to achieve targeted levels of accuracy.
+
+First, we show how the `simvcd` function can be used to accurately approximate the true VCD of the linear discriminant model applied in the original paper, which in this case is known to be $8$ (one more than the number of features). In this case, we must write a custom function and prediction method that takes the output of the base `glm` from R and turns it into the expected format.
+
+```{r}
+mylogit <- function(formula, data){
+  m <- structure(
+    glm(formula=formula,data=data,family=binomial(link="logit")),
+    class=c("svrclass","glm")  #IMPORTANT - must use the class svrclass to work correctly
+  )
+  return(m)
+}
+mypred <- function(m,newdata){
+  out <- predict.glm(m,newdata,type="response")
+  out <- factor(ifelse(out>0.5,1,0),levels=c("0","1")) #Important - must specify levels to account for possibility of all observations being classified into the same class in smaller samples
+  return(out)
+}
+simvcd(model=mylogit,dim=7,m=100,k=100,maxn=500,predictfn = mypred)
+```
+
+# Works Cited
+
+Dressel, J. and Farid, H., 2018. The accuracy, fairness, and limits of predicting recidivism. Science advances, 4(1), p.eaao5580.

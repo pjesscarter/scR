@@ -54,15 +54,18 @@ loss <- function(h,ngrid,xi,a=0.16,a1=1.2,a11=0.14927){
 }
 
 #Note - make parallelization optionally removable
-simvcd <- function(model,dim,packages,m=1000,k=1000,maxn=5000,coreoffset=0, ...){
+simvcd <- function(model,dim,packages=NULL,m=1000,k=1000,maxn=5000,coreoffset=0, predictfn = NULL, ...){
   ngrid <- seq(dim,maxn,(maxn/k))
   cl <- detectCores() -coreoffset
   cl <- makeCluster(cl)
   l<-dim
-  clusterExport(cl,varlist = c("l","k","m","model","packages"),envir = environment())
+  clusterExport(cl,varlist = c("l","k","m","model","packages","predictfn"),envir = environment())
   clusterEvalQ(cl=cl,expr={
     library(dplyr)
     lapply(packages, library, character.only = TRUE)
+    if(!is.null(predictfn)){
+      predict.svrclass <- predictfn
+    }
   })
   #Need to work on passing function arguments with pbapply - some issues around parallelization
   xihats <- suppressWarnings({pbsapply(ngrid,risk_bounds,...,cl=cl)})
