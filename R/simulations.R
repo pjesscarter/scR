@@ -1,4 +1,7 @@
-estimate_accuracy <- function(formula, data, model, nsample= 30, steps= 50,eta=0.05,delta=0.05,epsilon=0.05, predictfn = NULL,...){
+estimate_accuracy <- function(formula, model, data=NULL, dim=NULL,maxn=NULL,nsample= 30, steps= 50,eta=0.05,delta=0.05,epsilon=0.05, predictfn = NULL,...){
+  if(is.null(data)){
+    data <- gendata(model,dim,maxn,predictfn,...)
+  }
   results <- list()
   outcome <- all.vars(formula)[1]
   dat <- model.frame(formula,data)

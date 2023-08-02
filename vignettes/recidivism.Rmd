@@ -80,7 +80,7 @@ The package also provides utility for users to directly estimate accuracy given 
 
 ```{r,warning=FALSE}
 br <- scR::br
-results <- estimate_accuracy(two_year_recid ~ race + sex + age + juv_fel_count + juv_misd_count + priors_count + charge_degree..misd.fel. + two_year_recid,br,mylogit,predictfn = mypred)
+results <- estimate_accuracy(two_year_recid ~ race + sex + age + juv_fel_count + juv_misd_count + priors_count + charge_degree..misd.fel. + two_year_recid,mylogit,br,predictfn = mypred)
 ```
 
 The `plot_accuracy` function also provides a useful helper to quickly display the results of the simulation graphically using either the `ggplot2` or `plotly` libraries:
