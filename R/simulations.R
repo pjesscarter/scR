@@ -1,7 +1,12 @@
-estimate_accuracy <- function(data, nsample= 30, steps= 50){
+estimate_accuracy <- function(formula, data, model, nsample= 30, steps= 50,eta=0.05,delta=0.05,epsilon=0.05, predictfn = NULL,...){
   results <- list()
+  outcome <- all.vars(formula)[1]
+  dat <- model.frame(formula,data)
   #nvalues <- seq(4,300,15)
-  nvalues <- seq((ncol(data)+1),nrow(data),steps)
+  nvalues <- seq((ncol(dat)),nrow(dat),steps)
+  if(!is.null(predictfn)){
+    predict.svrclass <- predictfn
+  }
   ####function printing out the minimum sample size that achieves the highest accuracy
   for(i in seq_along(nvalues)){
     n <- nvalues[i]
@@ -13,31 +18,24 @@ estimate_accuracy <- function(data, nsample= 30, steps= 50){
       skip <- T
       while(skip){
         skip <- F
-        indices <- sample(seq_len(nrow(br)),n)
-        sample <- br[indices,c(2:7,9,11)] %>% ungroup() %>% #Note that errors should be drawn at sampling stage,
-          #otherwise there is a 0 prob of observing some values ex ante
-          mutate(error = rbinom(nrow(.),1,eta),
-                 outobs = as.factor(ifelse(!error, two_year_recid,!two_year_recid)))
-        m <- tryCatch({train(sample[,1:7],as.factor(sample$outobs),
-                             method = "rf",
-                             #family = "binomial",
-                             trControl= trainControl("cv"))},
-                      error=function(e){
-                        skip <<- T}
-        ) #Think carefully about how training choices matter
-        # form <- as.formula(paste("outobs ~ ",paste(colnames(sample)[1:7],sep=" + ",collapse=" + ")))
-        # m <- tryCatch({glm(form,data=sample,family=binomial())},
-        #               error=function(e){
-        #                 skip <<- T}
-        #) #Think carefully about how training choices matter
+        indices <- sample(seq_len(nrow(dat)),n)
+        samp <- dat[indices,]
+        error <- rbinom(nrow(samp),1,eta)
+        samp$outobs <- factor(ifelse(error,!samp[[outcome]],samp[[outcome]]),levels=c("0","1"))
+        samp <- samp %>% select(!all_of(outcome))
+        m <- tryCatch({model(outobs ~.,data=samp,...)},
+                       error=function(e){
+                         warning("Model failed to compute, regenerating training data")
+                         skip <<- T} #TODO - provide useful error message to help diagnose misuse
+        )
       }
-      pred <- predict(m,br[,c(2:7,9)])
-      accuracy[j] <- mean(as.numeric(levels(pred)[pred])== br$two_year_recid)
-      prec[j] <- tryCatch({precision(table(levels(pred)[pred],br$two_year_recid), relevant = 1)},
+      pred <- suppressWarnings({predict(m,dat %>% select(!all_of(outcome)))})
+      accuracy[j] <- mean(as.numeric(levels(pred)[pred])== factor(dat[[outcome]],levels=c("0","1")))
+      prec[j] <- tryCatch({precision(table(levels(pred)[pred],factor(dat[[outcome]],levels=c("0","1"))), relevant = 1)},
                           error = function(e){return(NA)})
-      rec[j] <- tryCatch({recall(table(levels(pred)[pred],br$two_year_recid), relevant = 1)},
+      rec[j] <- tryCatch({recall(table(levels(pred)[pred],factor(dat[[outcome]],levels=c("0","1"))), relevant = 1)},
                          error = function(e){return(NA)})
-      fscore[j] <- tryCatch({F_meas(table(levels(pred)[pred],br$two_year_recid), relevant = 1)},
+      fscore[j] <- tryCatch({F_meas(table(levels(pred)[pred],factor(dat[[outcome]],levels=c("0","1"))), relevant = 1)},
                             error = function(e){return(NA)})
       
     }
@@ -53,21 +51,29 @@ estimate_accuracy <- function(data, nsample= 30, steps= 50){
                                                      epsilon = quantile(1-accuracy,1-delta,na.rm=T))
   return(summtable)
 }
+plot_accuracy <- function(table,metrics=c("Accuracy","Precision","Recall","Fscore","delta","epsilon"),plottype = c("ggplot","plotly")){
+  
+  toplot <- table %>% 
+   select(n,all_of(metrics)) %>%
+      pivot_longer(cols=Accuracy:epsilon,names_to = "Metric",values_to = "Value")
+  if("delta" %in% metrics){
+   toplot$Metric[which(toplot$Metric == "delta")] <-'\u03B4'
+  }
+  if("epsilon" %in% metrics){
+    toplot$Metric[which(toplot$Metric == "epsilon")] <-'\u03B5'
+  }
+  plottype <- plottype[1]
+  if(plottype=="ggplot"){
+    plot<- toplot %>% 
+      ggplot(.,aes(x=n,y=Value,col=Metric)) + geom_line() 
+  } else if(plottype=="plotly"){
+    plot <- plot_ly(toplot, x= ~n, y = ~Value, color = ~Metric, mode = 'lines') %>%
+      layout(yaxis = list(title= ""), legend = list(orientation = ''))  #TODO - add ability to change plotly options
+  }else{
+    simpleError("Invalid Plot Type")
+  }
+  return(plot)
+    
+}
 
-#print(summtable[which.max(summtable$Accuracy), ]$n)
-#Fix delta = 0.1, find smallest n that guarantees epsilon = 0.05 - no such n exists
-#print(summtable[cumsum(summtable$epsilon < epsilon)==1, ]$n)
-#summtable2 <- summtable[,c(1:5,7)]
-#summtable %>% 
-#  pivot_longer(cols=Accuracy:epsilon,names_to = "Metric",values_to = "Value") %>%
-#  ggplot(.,aes(x=n,y=Value,col=Metric)) + geom_line() 
-
-#epsilon <- '\u03B5'
-#colnames(summtable2)[6] <- epsilon
-
-#data<- summtable2 %>% 
-  #pivot_longer(cols=Accuracy:epsilon,names_to = "Metric",values_to = "Value") 
-
-#fig <- plot_ly(data, x= ~n, y = ~Value, color = ~Metric, mode = 'lines') %>%
-  #layout(yaxis = list(title= ""), legend = list(orientation = ''))
 

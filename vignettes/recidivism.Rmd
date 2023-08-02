@@ -13,8 +13,18 @@ knitr::opts_chunk$set(
   comment = "#>"
 )
 ```
-
+```{r, include=FALSE}
+devtools::load_all()
+library(parallel)
+library(pbapply)
+library(caret)
+library(ggplot2)
+library(plotly)
+library(dplyr)
+library(tidyr)
+```
 ```{r setup}
+
 library(scR)
 ```
 
@@ -24,9 +34,9 @@ The `simvcd()` function provides a simulation-based method for estimating the vc
 
 In order to estimate the VC dimension for a given model, the user should provide the model (along with a `list` of any packages that need to be loaded), along with its dimension (i.e. the number of predictor variables) and simulation parameters $m,k,N$, which govern the number of simulations at each design point, the number of design points, and the maximum sample size, respectively. Note that consistency requires that all three of these parameters approach infinity, so that users must choose between computation time and the accuracy of the approximation. Below is an example of estimating the VC dimension for a small (2-variable) random forest using the default parameters. 
 
-```{r}
+```{r,warning=FALSE}
 library(randomForest)
-#simvcd(model=randomForest,dim=2,m=100,k=100,maxn=500,packages= list("randomForest"))
+simvcd(model=randomForest,dim=2,m=100,k=100,maxn=500,packages= list("randomForest"))
 ```
 
 # Replication example: Predicting Recidivism
@@ -48,9 +58,45 @@ mypred <- function(m,newdata){
   out <- factor(ifelse(out>0.5,1,0),levels=c("0","1")) #Important - must specify levels to account for possibility of all observations being classified into the same class in smaller samples
   return(out)
 }
-simvcd(model=mylogit,dim=7,m=1000,k=1000,maxn=5000,predictfn = mypred) #Takes about 20 minutes to run on mid-range test machine (Intel i5-11600K CPU)
+vcd <- simvcd(model=mylogit,dim=7,m=100,k=100,maxn=500,predictfn = mypred) #Takes about 20 minutes to run on mid-range test machine (Intel i5-11600K CPU)
+```
+This then allows us to estimate the minimum sample size $n$ needed to guarantee our chosen accuracy, given an assumed misclassification rate of $0.5$:
+
+```{r}
+scb(vcd,epsilon=0.05,delta=0.05,eta=0.05)
+```
+Note that we can also not specify the VCD and the function will run the simulation automatically, as long as it is provided with the appropriate
+```{r,eval=FALSE}
+scb(epsilon=0.05,delta=0.05,eta=0.05,theor=F,model=mylogit,dim=7,m=100,k=100,maxn=500,predictfn = mypred)
+```
+In this case, we know the true VCD dimension (8), so we can also assess the magnitude of the estimation error's impact on the required sample size:
+
+```{r}
+abs(scb(vcd,epsilon=0.05,delta=0.05,eta=0.05)-scb(8,epsilon=0.05,delta=0.05,eta=0.05))
+```
+## Estimating Accuracy Directly
+
+The package also provides utility for users to directly estimate accuracy given assumptions on the data through the `estimate_accuracy` function. Since we already have data collected for this application, we can simply run the function directly on the original dataset:
+
+```{r,warning=FALSE}
+br <- scR::br
+results <- estimate_accuracy(two_year_recid ~ race + sex + age + juv_fel_count + juv_misd_count + priors_count + charge_degree..misd.fel. + two_year_recid,br,mylogit,predictfn = mypred)
 ```
 
+The `plot_accuracy` function also provides a useful helper to quickly display the results of the simulation graphically using either the `ggplot2` or `plotly` libraries:
+
+```{r}
+fig <- plot_accuracy(results)
+fig
+```
+
+Or, using `plotly`:
+
+```{r}
+
+fig <- plot_accuracy(results,plottype = "plotly")
+fig
+```
 # Works Cited
 
 Dressel, J. and Farid, H., 2018. The accuracy, fairness, and limits of predicting recidivism. Science advances, 4(1), p.eaao5580.
