@@ -1,5 +1,5 @@
 Package: scR
-Title: Estimate VCD Dimension and Required Sample Size for Applied Machine Learning Research
+Title: Estimate VCD Dimension and Required Sample Size Necessary for Applied Machine Learning Research
 Version: 0.1.0
 Authors@R:
     c(person("Perry", "Carter", , "pjcarter@princeton.edu", role = c("aut", "cre"),
