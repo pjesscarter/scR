@@ -1,6 +1,6 @@
 # scR:  Learning from Noise: Applying Sample Complexity Bounds for Political Science Research
 
-This R package provides a computationally efficient way of calculating Sample Complexity Bounds (scb), coauthored by Carter and Choi (2023).
+This R package provides a computationally efficient way of calculating Sample Complexity Bounds (scb), suggested by Carter and Choi (2023).
 
 
 ## Authors
