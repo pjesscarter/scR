@@ -32,14 +32,8 @@ library(scR)
 
 # Simulating VC Dimension
 
-The `simvcd()` function provides a simulation-based method for estimating the vcd dimension of any estimation algorithm. This function relies on two helper functions, `risk_bounds()` and `loss`, also included in the package, which provide estimates of the empirical risk for a given $n$ and define the sum of squares to be minimized, respectively. In the current version of the package, the estimation algorithm must follow the syntax of taking a `formula` object and rectangular `data.frame` as input and generating a binary factor variable as output. Future versions will support other common formats, as well as the provision of user-defined helper functions for other cases. Examples of common use cases are included in this vignette. 
-
 In order to estimate the VC dimension for a given model, the user should provide the model (along with a `list` of any packages that need to be loaded), along with its dimension (i.e. the number of predictor variables) and simulation parameters $m,k,N$, which govern the number of simulations at each design point, the number of design points, and the maximum sample size, respectively. Note that consistency requires that all three of these parameters approach infinity, so that users must choose between computation time and the accuracy of the approximation. Below is an example of estimating the VC dimension for a small (2-variable) random forest using the default parameters. 
 
-```{r,warning=FALSE}
-library(randomForest)
-simvcd(model=randomForest,dim=2,m=100,k=100,maxn=500,packages= list("randomForest"))
-```
 
 ```{r,warning=FALSE}
 library(e1071)
@@ -47,9 +41,9 @@ simvcd(model=svm,dim=2,m=100,k=100,maxn=500,packages= list("e1071"))
 ```
 
 
-# Replication example: dw-Nominate
+# Replication example: dw-nominate
 
-We use congressional voting data from Lewis et al.  (2022)'s Voteview: Congressional Roll-Call Votes Database. https://voteview.com/ to predict ideology score. Below are descriptions of idelogical fiedls 
+We use congressional voting data from Lewis et al.  (2022)'s Voteview: Congressional Roll-Call Votes Database to predict ideology score. Below are descriptions of idelogical fiedls 
 
 Ideological Fields:
 mid_1: NOMINATE First-dimension midpoint estimate.
@@ -87,7 +81,8 @@ mypred <- function(m,newdata){
   return(out)
 }
 
-vcd <- simvcd(model=mysvm,dim=2,m=100,k=100,maxn=500,predictfn = mypred) #Takes about 20 minutes to run on mid-range test machine (Intel i5-11600K CPU)
+vcd <- simvcd(model=mysvm,dim=2,m=100,k=100,maxn=500,predictfn = mypred)
+#vcd <- simvcd(model=mysvm,dim=2,m=100,k=100,maxn=500,predictfn = mypred) #Takes about 20 minutes to run on mid-range test machine (Intel i5-11600K CPU)
 ```
 
 
@@ -97,8 +92,7 @@ vcd <- simvcd(model=mysvm,dim=2,m=100,k=100,maxn=500,predictfn = mypred) #Takes 
 The package also provides utility for users to directly estimate accuracy given assumptions on the data through the `estimate_accuracy` function. Since we already have data collected for this application, we can simply run the function directly on the original dataset:
 
 ```{r,warning=FALSE}
-br <- scR::br
-results <- estimate_accuracy(two_year_recid ~ race + sex + age + juv_fel_count + juv_misd_count + priors_count + charge_degree..misd.fel.,mylogit,br,predictfn = mypred)
+results <- estimate_accuracy(nominate_mid_1 ~yea_count+nay_count,svm, votes, predictfn = mypred)
 ```
 
 The `plot_accuracy` function also provides a useful helper to quickly display the results of the simulation graphically using either the `ggplot2` or `plotly` libraries:
