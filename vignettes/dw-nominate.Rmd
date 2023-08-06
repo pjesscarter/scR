@@ -58,21 +58,21 @@ votes<- read.csv("CongressionalVotes.csv")
 ```{r}
 mysvm <- function(formula, data){
   m <- structure(
-    svm(formula=formula,data=data, kernel = "radial"),
-    #class=c("svrclass","glm")  #IMPORTANT - must use the class svrclass to work correctly
+    svm(formula=formula,data=data, kernel = "linear"),
+    class=c("svrclass","svm")  #IMPORTANT - must use the class svrclass to work correctly
   )
   return(m)
 }
 
 
 mypred <- function(m,newdata){
-  out <- predict(m,newdata,type="response")
+  out <- predict(m,newdata)
   out <- factor(ifelse(out>0,1,0),levels=c("0","1")) #Important - must specify levels to account for possibility of all observations being classified into the same class in smaller samples
   return(out)
 }
 
 vcd <- simvcd(model=mysvm,dim=2,m=100,k=100,maxn=500,predictfn = mypred)
-#vcd <- simvcd(model=mysvm,dim=2,m=100,k=100,maxn=500,predictfn = mypred) #Takes about 20 minutes to run on mid-range test machine (Intel i5-11600K CPU)
+#vcd <- simvcd(model=mysvm,dim=2,m=100,k=100,maxn=500,predictfn = mypred)
 ```
 
 
