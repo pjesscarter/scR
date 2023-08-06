@@ -1,4 +1,8 @@
-estimate_accuracy <- function(formula, data, model, nsample= 30, steps= 50,eta=0.05,delta=0.05,epsilon=0.05, predictfn = NULL,...){
+estimate_accuracy <- function(formula, model, data=NULL, dim=NULL,maxn=NULL,nsample= 30, steps= 50,eta=0.05,delta=0.05,epsilon=0.05, predictfn = NULL,...){
+  if(is.null(data)){
+    names <- all.vars(formula)
+    data <- gendata(model,dim,maxn,predictfn,names, ...)
+  }
   results <- list()
   outcome <- all.vars(formula)[1]
   dat <- model.frame(formula,data)
@@ -21,7 +25,11 @@ estimate_accuracy <- function(formula, data, model, nsample= 30, steps= 50,eta=0
         indices <- sample(seq_len(nrow(dat)),n)
         samp <- dat[indices,]
         error <- rbinom(nrow(samp),1,eta)
-        samp$outobs <- factor(ifelse(error,!samp[[outcome]],samp[[outcome]]),levels=c("0","1"))
+        if(is.factor(samp[[outcome]])){
+          samp$outobs <- factor(ifelse(error,!as.numeric(as.character(samp[[outcome]])),as.numeric(as.character(samp[[outcome]]))),levels=c("0","1"))
+        } else{
+          samp$outobs <- factor(ifelse(error,!samp[[outcome]],samp[[outcome]]),levels=c("0","1"))
+        }
         samp <- samp %>% select(!all_of(outcome))
         m <- tryCatch({model(outobs ~.,data=samp,...)},
                        error=function(e){

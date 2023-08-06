@@ -1,0 +1,27 @@
+Package: scR
+Title: Estimate VCD Dimension and Required Sample Size Necessary for Applied Machine Learning Research
+Version: 0.1.0
+Authors@R:
+    c(person("Perry", "Carter", , "pjcarter@princeton.edu", role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0002-4684-6533")),
+	person("Dahyun", "Choi", , "dahyunc@princeton.edu", role = c("aut"),
+		comment = c(ORCID = "0000-0002-2628-1467")))
+Description: The scR package provides
+License: `use_mit_license()`
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.2.3
+URL: https://github.com/pjesscarter/scR
+BugReports: https://github.com/pjesscarter/scR/issues
+Imports:
+    parallel,
+    pbapply,
+    caret,
+    dplyr,
+    tidyr,
+    ggplot2,
+    plotly
+Suggests:
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr
