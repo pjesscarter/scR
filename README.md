@@ -4,7 +4,7 @@ This R package provides a computationally efficient way of calculating Sample Co
 
 
 ## Authors
-Perry Carter and [Dahyun Choi](https://dahyunc.github.io/)
+[Perry Carter](https://politics.princeton.edu/people/perry-carter) and [Dahyun Choi](https://dahyunc.github.io/)
 
 ## Paper
 Learning from Noise: Applying Sample Complexity Bounds for Political Science Research
