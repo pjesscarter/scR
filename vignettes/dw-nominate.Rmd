@@ -26,13 +26,10 @@ library(tidyr)
 ```
 
 ```{r setup}
-
 library(scR)
 ```
 
 # Simulating VC Dimension
-
-In order to estimate the VC dimension for a given model, the user should provide the model (along with a `list` of any packages that need to be loaded), along with its dimension (i.e. the number of predictor variables) and simulation parameters $m,k,N$, which govern the number of simulations at each design point, the number of design points, and the maximum sample size, respectively. Note that consistency requires that all three of these parameters approach infinity, so that users must choose between computation time and the accuracy of the approximation. Below is an example of estimating the VC dimension for a small (2-variable) random forest using the default parameters. 
 
 
 ```{r,warning=FALSE}
@@ -67,13 +64,6 @@ mysvm <- function(formula, data){
   return(m)
 }
 
-#mylogit <- function(formula, data){
-#  m <- structure(
-#    glm(formula=formula,data=data,family=binomial(link="logit")),
-#    class=c("svrclass","glm")  #IMPORTANT - must use the class svrclass to work correctly
-#  )
-#  return(m)
-#}
 
 mypred <- function(m,newdata){
   out <- predict(m,newdata,type="response")
