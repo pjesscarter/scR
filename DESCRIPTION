@@ -4,7 +4,8 @@ Version: 0.1.0
 Authors@R:
     c(person("Perry", "Carter", , "pjcarter@princeton.edu", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-4684-6533")),
-	person("Dahyun", "Choi", , "dahyunc@princeton.edu", role = c("aut")))
+	person("Dahyun", "Choi", , "dahyunc@princeton.edu", role = c("aut"),
+		comment = c(ORCID = "0000-0002-2628-1467")))
 Description: The scR package provides
 License: `use_mit_license()`
 Encoding: UTF-8
