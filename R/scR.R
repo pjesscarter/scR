@@ -74,7 +74,6 @@ risk_bounds <- function(x,...){
 #' @param a11 Scaling coefficient for the bounding function. Defaults to the value given by Vapnik, Levin and Le Cun 1994.
 #' @return A real number giving the estimated value of the MSE given the current guess.
 #' @seealso [simvcd()], the user-facing function for simulating VC dimension and [risk_bounds()] to generate estimates for xi.
-#' @references 
 loss <- function(h,ngrid,xi,a=0.16,a1=1.2,a11=0.14927){
   #These constants are calculated in Vapnik, Levin and Le Cun 1994
   #based on the known VC dimension of linear discriminant functions 
@@ -91,7 +90,7 @@ loss <- function(h,ngrid,xi,a=0.16,a1=1.2,a11=0.14927){
 
 #' Estimate the Vapnik-Chervonenkis (VC) dimension of an arbitrary binary classification algorithm.
 #'
-#' @param model A binary classification model supplied by the user. Must take arguments [formula] and [data]
+#' @param model A binary classification model supplied by the user. Must take arguments `formula` and `data`
 #' @param dim A positive integer giving dimension (number of input features) of the model.
 #' @param packages A `list` of strings giving the names of packages to be loaded in order to estimate the model.
 #' @param m A positive integer giving the number of simulations to be performed at each design point (sample size value). Higher values give more accurate results but increase computation time.

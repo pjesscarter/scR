@@ -1,3 +1,37 @@
+#' Estimate sample complexity bounds for a binary classification algorithm using either simulated or user-supplied data.
+#'
+#' @param formula A `formula` that can be passed to the `model` argument to define the classification algorithm
+#' @param model A binary classification model supplied by the user. Must take arguments `formula` and `data`
+#' @param data Optional. A rectangular `data.frame` object giving the full data from which samples are to be drawn. If left unspecified, [gendata()] is called to produce synthetic data with an appropriate structure.
+#' @param dim Required if `data` is unspecified. Gives the horizontal dimension of the data (number of predictor variables) to be generated.
+#' @param maxn Required if `data` is unspecified. Gives the vertical dimension of the data (number of observations) to be generated.
+#' @param nsample A positive integer giving the number of samples to be generated for each value of $n$. Larger values give more accurate results.
+#' @param steps A positive integer giving the number of values of $n$ for which simulations should be conducted. Larger values give more accurate results.
+#' @param eta A real number between 0 and 1 giving the probability of misclassification error in the training data.
+#' @param delta A real number between 0 and 1 giving the targeted maximum probability of observing an OOS error rate higher than `epsilon`
+#' @param epsilon A real number between 0 and 1 giving the targeted maximum out-of-sample (OOS) error rate
+#' @param predictfn An optional user-defined function giving a custom predict method. If also using a user-defined model, the `model` should output an object of class `"svrclass"` to avoid errors.
+#' @param ... Additional arguments that need to be passed to `model`
+#' @return A `list` containing two named elements. `Raw` gives the exact output of the simulations, while `Summary` gives a table of accuracy metrics, including the achieved levels of $\epsilon$ and $\delta$ given the specified values. Alternative values can be calculated using [getpac()]
+#' @seealso [plot_accuracy()], to represent simulations visually, [getpac()], to calculate summaries for alternate values of $\epsilon$ and $\delta$ without conducting a new simulation, and [gendata()], to generated synthetic datasets.
+#' @examples
+#' mylogit <- function(formula, data){
+#' m <- structure(
+#'   glm(formula=formula,data=data,family=binomial(link="logit")),
+#'   class=c("svrclass","glm")  #IMPORTANT - must use the class svrclass to work correctly
+#' )
+#' return(m)
+#' }
+#' mypred <- function(m,newdata){
+#' out <- predict.glm(m,newdata,type="response")
+#' out <- factor(ifelse(out>0.5,1,0),levels=c("0","1")) #Important - must specify levels to account for possibility of all observations being classified into the same class in smaller samples
+#' return(out)
+#' }
+#' br <- scR::br
+#' results <- estimate_accuracy(two_year_recid ~ race + sex + age + juv_fel_count + juv_misd_count + priors_count + charge_degree..misd.fel.,mylogit,br,predictfn = mypred)
+#' @export
+
+
 estimate_accuracy <- function(formula, model, data=NULL, dim=NULL,maxn=NULL,nsample= 30, steps= 50,eta=0.05,delta=0.05,epsilon=0.05, predictfn = NULL,...){
   if(is.null(data)){
     names <- all.vars(formula)
@@ -57,11 +91,71 @@ estimate_accuracy <- function(formula, model, data=NULL, dim=NULL,maxn=NULL,nsam
                                                      Fscore = mean(fscore,na.rm=T),
                                                      delta = mean((1-accuracy) > epsilon,na.rm=T),
                                                      epsilon = quantile(1-accuracy,1-delta,na.rm=T))
-  return(summtable)
+  return(list("Raw"=results,"Summary"=summtable))
 }
+#' Recalculate achieved sample complexity bounds given different parameter inputs
+#'
+#' @param table A list containing an element named `Raw`. Should always be used with the output of [estimate_accuracy()]
+#' @param delta A real number between 0 and 1 giving the targeted maximum probability of observing an OOS error rate higher than `epsilon`
+#' @param epsilon A real number between 0 and 1 giving the targeted maximum out-of-sample (OOS) error rate
+#' @return A `list` containing two named elements. `Raw` gives the exact output of the simulations, while `Summary` gives a table of accuracy metrics, including the achieved levels of $\epsilon$ and $\delta$ given the specified values. Alternative values can be calculated using [getpac()] again.
+#' @seealso [plot_accuracy()], to represent simulations visually, [getpac()], to calculate summaries for alternate values of $\epsilon$ and $\delta$ without conducting a new simulation, and [gendata()], to generated synthetic datasets.
+#' @examples
+#' mylogit <- function(formula, data){
+#' m <- structure(
+#'   glm(formula=formula,data=data,family=binomial(link="logit")),
+#'   class=c("svrclass","glm")  #IMPORTANT - must use the class svrclass to work correctly
+#' )
+#' return(m)
+#' }
+#' mypred <- function(m,newdata){
+#' out <- predict.glm(m,newdata,type="response")
+#' out <- factor(ifelse(out>0.5,1,0),levels=c("0","1")) #Important - must specify levels to account for possibility of all observations being classified into the same class in smaller samples
+#' return(out)
+#' }
+#' br <- scR::br
+#' results <- estimate_accuracy(two_year_recid ~ race + sex + age + juv_fel_count + juv_misd_count + priors_count + charge_degree..misd.fel.,mylogit,br,predictfn = mypred)
+#' resultsalt <- getpac(results,epsilon=0.5,delta=0.3)
+#' print(resultsalt$Summary)
+#' @export
+getpac <- function(table,epsilon=0.05,delta=0.05){
+  results <- table$Raw
+  summtable <- results %>% group_by(n) %>% summarise(Accuracy = mean(accuracy,na.rm=T), 
+                                                     Precision = mean(prec,na.rm=T), 
+                                                     Recall = mean(rec,na.rm=T),
+                                                     Fscore = mean(fscore,na.rm=T),
+                                                     delta = mean((1-accuracy) > epsilon,na.rm=T),
+                                                     epsilon = quantile(1-accuracy,1-delta,na.rm=T))
+  return(list("Raw"=results,"Summary"=summtable))
+}
+#' Represent simulated sample complexity bounds graphically
+#'
+#' @param table A list containing an element named `Raw`. Should always be used with the output of [estimate_accuracy()]
+#' @param metrics A character vector containing the metrics to display in the plot. Can be any of "Accuracy", "Precision", "Recall", "Fscore", "delta", "epsilon"
+#' @param plottype A string giving the graphics package to be used to generate the plot. Can be one of "ggplot" or "plotly"
+#' @return Either a [ggplot2] or [plotly] plot object, depending on the chosen option of `plottype`.
+#' @seealso [estimate_accuracy()], to generate estimated sample complexity bounds.
+#' @examples
+#' mylogit <- function(formula, data){
+#' m <- structure(
+#'   glm(formula=formula,data=data,family=binomial(link="logit")),
+#'   class=c("svrclass","glm")  #IMPORTANT - must use the class svrclass to work correctly
+#' )
+#' return(m)
+#' }
+#' mypred <- function(m,newdata){
+#' out <- predict.glm(m,newdata,type="response")
+#' out <- factor(ifelse(out>0.5,1,0),levels=c("0","1")) #Important - must specify levels to account for possibility of all observations being classified into the same class in smaller samples
+#' return(out)
+#' }
+#' br <- scR::br
+#' results <- estimate_accuracy(two_year_recid ~ race + sex + age + juv_fel_count + juv_misd_count + priors_count + charge_degree..misd.fel.,mylogit,br,predictfn = mypred)
+#' fig <- plot_accuracy(results)
+#' fig
+#' @export
 plot_accuracy <- function(table,metrics=c("Accuracy","Precision","Recall","Fscore","delta","epsilon"),plottype = c("ggplot","plotly")){
   
-  toplot <- table %>% 
+  toplot <- table$Summary %>% 
    select(n,all_of(metrics)) %>%
       pivot_longer(cols=Accuracy:epsilon,names_to = "Metric",values_to = "Value")
   if("delta" %in% metrics){

@@ -21,7 +21,7 @@ simvcd(
 )
 }
 \arguments{
-\item{model}{A binary classification model supplied by the user. Must take arguments \link{formula} and \link{data}}
+\item{model}{A binary classification model supplied by the user. Must take arguments \code{formula} and \code{data}}
 
 \item{dim}{A positive integer giving dimension (number of input features) of the model.}
 
