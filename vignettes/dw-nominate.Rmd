@@ -54,7 +54,7 @@ log_likelihood: NOMINATE estimated log-likelihood.
 #score <- read.csv("HSall_members_ideology.csv")
 #votes <- read.csv("HSall_votes.csv")
 rollcalls <- read.csv("congress_rollcalls.csv")
-rollcalls$score <- ifelse(rollcalls$nominate_mid_1>0,1, 0)
+rollcalls$score <- ifelse(rollcalls$nominate_mid_1>0, 1,0)
 ```
 
 
@@ -103,7 +103,7 @@ vcd <- simvcd(model=mysvm,dim=2,m=100,k=100,maxn=500,predictfn = mypred)
 The package also provides utility for users to directly estimate accuracy given assumptions on the data through the `estimate_accuracy` function. Since we already have data collected for this application, we can simply run the function directly on the original dataset:
 
 ```{r,warning=FALSE}
-results <- estimate_accuracy(nominate_mid_1 ~yea_count+nay_count,svm, votes, predictfn = mypred)
+results <- estimate_accuracy(score ~yea_count+nay_count,mylogit, rollcalls, predictfn = mypred)
 ```
 
 The `plot_accuracy` function also provides a useful helper to quickly display the results of the simulation graphically using either the `ggplot2` or `plotly` libraries:
