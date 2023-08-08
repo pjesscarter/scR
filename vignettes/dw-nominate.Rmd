@@ -51,8 +51,29 @@ log_likelihood: NOMINATE estimated log-likelihood.
 
 
 ```{r}
-votes<- read.csv("CongressionalVotes.csv")
+#score <- read.csv("HSall_members_ideology.csv")
+#votes <- read.csv("HSall_votes.csv")
+rollcalls <- read.csv("congress_rollcalls.csv")
+rollcalls$score <- ifelse(rollcalls$nominate_mid_1>0,1, 0)
 ```
+
+
+```{r}
+mylogit <- function(formula, data){
+  m <- structure(
+    glm(formula=formula,data=data,family=binomial(link="logit")),
+    class=c("svrclass","glm")  #IMPORTANT - must use the class svrclass to work correctly
+  )
+  return(m)
+}
+mypred <- function(m,newdata){
+  out <- predict.glm(m,newdata,type="response")
+  out <- factor(ifelse(out>0.5,1,0),levels=c("0","1")) #Important - must specify levels to account for possibility of all observations being classified into the same class in smaller samples
+  return(out)
+}
+vcd <- simvcd(model=mylogit,dim=2,m=100,k=100,maxn=500,predictfn = mypred) #Takes about 20 minutes to run on mid-range test machine (Intel i5-11600K CPU)
+```
+
 
 
 ```{r}
