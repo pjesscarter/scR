@@ -133,6 +133,18 @@ fig <- plot_accuracy(results2,plottype = "plotly")
 fig
 ```
 
+Theoretical
 
+```{r,warning=FALSE}
+results <- estimate_accuracy(score ~ yea_count+nay_count, mylogit,maxn=nrow(rollcalls2),dim=2,predictfn = mypred)
+```
+
+Unsurprisingly, the observed accuracy on the synthetic data is much more comparable to that expected based on theoretical bounds, since the target concept is ``learnable'' with the chosen algorithm by construction.
+
+```{r}
+res2 <- getpac(results,delta = 0.05,epsilon=0.05) 
+fig <- plot_accuracy(res2,plottype = "plotly")
+fig
+```
 # Works Cited
 Lewis, Jeffrey B., Keith Poole, Howard Rosenthal, Adam Boche, Aaron Rudkin, and Luke Sonnet (2021). Voteview: Congressional Roll-Call Votes Database. https://voteview.com/
