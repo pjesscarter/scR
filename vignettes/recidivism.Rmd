@@ -13,6 +13,7 @@ knitr::opts_chunk$set(
   comment = "#>"
 )
 ```
+
 ```{r, include=FALSE}
 devtools::load_all()
 library(parallel)
@@ -37,6 +38,7 @@ In order to estimate the VC dimension for a given model, the user should provide
 ```{r,warning=FALSE}
 library(randomForest)
 simvcd(model=randomForest,dim=2,m=100,k=100,maxn=500,packages= list("randomForest"))
+##randomforest == 994
 ```
 
 # Replication example: Predicting Recidivism
@@ -87,7 +89,6 @@ The `plot_accuracy` function also provides a useful helper to quickly display th
 
 ```{r}
 fig <- plot_accuracy(results)
-fig
 ```
 
 Or, using `plotly`:
