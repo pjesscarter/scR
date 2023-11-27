@@ -11,6 +11,10 @@
 #' @param delta A real number between 0 and 1 giving the targeted maximum probability of observing an OOS error rate higher than `epsilon`
 #' @param epsilon A real number between 0 and 1 giving the targeted maximum out-of-sample (OOS) error rate
 #' @param predictfn An optional user-defined function giving a custom predict method. If also using a user-defined model, the `model` should output an object of class `"svrclass"` to avoid errors.
+#' @param power A logical indicating whether experimental power based on the predictions should also be reported
+#' @param effect_size If `power` is `TRUE`, a real number indicating the scaled effect size the user would like to be able to detect.
+#' @param powersims If `power` is `TRUE`, an integer indicating the number of simulations to be conducted at each step to calculate power.
+#' @param alpha If `power` is `TRUE`, a real number between 0 and 1 indicating the probability of Type I error to be used for hypothesis testing. Default is 0.05.
 #' @param ... Additional arguments that need to be passed to `model`
 #' @return A `list` containing two named elements. `Raw` gives the exact output of the simulations, while `Summary` gives a table of accuracy metrics, including the achieved levels of $\epsilon$ and $\delta$ given the specified values. Alternative values can be calculated using [getpac()]
 #' @seealso [plot_accuracy()], to represent simulations visually, [getpac()], to calculate summaries for alternate values of $\epsilon$ and $\delta$ without conducting a new simulation, and [gendata()], to generated synthetic datasets.
@@ -32,16 +36,16 @@
 #' @export
 
 
-estimate_accuracy <- function(formula, model, data=NULL, dim=NULL,maxn=NULL,nsample= 30, steps= 50,eta=0.05,delta=0.05,epsilon=0.05, predictfn = NULL,...){
+estimate_accuracy <- function(formula, model, data=NULL, dim=NULL,maxn=NULL,nsample= 30, steps= 50,eta=0.05,delta=0.05,epsilon=0.05, predictfn = NULL,power = F,effect_size=NULL,powersims=NULL,alpha=0.05,...){
   if(is.null(data)){
     names <- all.vars(formula)
-    data <- gendata(model,dim,maxn,predictfn,names, ...)
+    data <- gendata(model,dim,maxn,predictfn,names,...)
   }
   results <- list()
   outcome <- all.vars(formula)[1]
   dat <- model.frame(formula,data)
   #nvalues <- seq(4,300,15)
-  nvalues <- seq((ncol(dat)),nrow(dat),steps)
+  nvalues <- seq((ncol(dat)+1),nrow(dat),steps)
   if(!is.null(predictfn)){
     predict.svrclass <- predictfn
   }
@@ -52,6 +56,7 @@ estimate_accuracy <- function(formula, model, data=NULL, dim=NULL,maxn=NULL,nsam
     prec <- vector()
     rec <- vector()
     fscore <- vector()
+    pwr <- vector()
     for(j in seq_len(nsample)){
       skip <- T
       while(skip){
@@ -65,7 +70,8 @@ estimate_accuracy <- function(formula, model, data=NULL, dim=NULL,maxn=NULL,nsam
           samp$outobs <- factor(ifelse(error,!samp[[outcome]],samp[[outcome]]),levels=c("0","1"))
         }
         samp <- samp %>% select(!all_of(outcome))
-        m <- tryCatch({model(outobs ~.,data=samp,...)},
+        m <- tryCatch({model(outobs ~.,data=samp,...
+                             )},
                        error=function(e){
                          warning("Model failed to compute, regenerating training data")
                          skip <<- T} #TODO - provide useful error message to help diagnose misuse
@@ -80,8 +86,21 @@ estimate_accuracy <- function(formula, model, data=NULL, dim=NULL,maxn=NULL,nsam
       fscore[j] <- tryCatch({F_meas(table(levels(pred)[pred],factor(dat[[outcome]],levels=c("0","1"))), relevant = 1)},
                             error = function(e){return(NA)})
       
+      if(power){
+        reject <- vector()
+        Dobs <- as.numeric(levels(pred)[pred])
+        Dtrue <- if(is.factor(dat[[outcome]])){as.numeric(as.character(dat[[outcome]]))} else{dat[[outcome]]}
+        for(r in 1:powersims){
+          Y <- effect_size * Dtrue + rnorm(length(Dobs))
+          X <- data.frame(D = Dobs, Y = Y)
+          mdl <- lm(Y ~ D, data=X)
+          reject[r] <- summary(mdl)$coefficients[2,4] < alpha
+        }
+        pwr[j] <- mean(reject)
+      } else{pwr[j] <- NA}
+      
     }
-    results[[i]] <- tryCatch({data.frame(accuracy,prec,rec,fscore,n)},
+    results[[i]] <- tryCatch({data.frame(accuracy,prec,rec,fscore,n,pwr)},
                              error = function(e){return(NA)})
   }
   results <- bind_rows(results)
@@ -90,7 +109,8 @@ estimate_accuracy <- function(formula, model, data=NULL, dim=NULL,maxn=NULL,nsam
                                                      Recall = mean(rec,na.rm=T),
                                                      Fscore = mean(fscore,na.rm=T),
                                                      delta = mean((1-accuracy) > epsilon,na.rm=T),
-                                                     epsilon = quantile(1-accuracy,1-delta,na.rm=T))
+                                                     epsilon = quantile(1-accuracy,1-delta,na.rm=T),
+                                                     Power = mean(pwr,na.rm=T))
   return(list("Raw"=results,"Summary"=summtable))
 }
 #' Recalculate achieved sample complexity bounds given different parameter inputs
@@ -153,11 +173,11 @@ getpac <- function(table,epsilon=0.05,delta=0.05){
 #' fig <- plot_accuracy(results)
 #' fig
 #' @export
-plot_accuracy <- function(table,metrics=c("Accuracy","Precision","Recall","Fscore","delta","epsilon"),plottype = c("ggplot","plotly")){
+plot_accuracy <- function(table,metrics=c("Accuracy","Precision","Recall","Fscore","delta","epsilon","Power"),plottype = c("ggplot","plotly")){
   
   toplot <- table$Summary %>% 
    select(n,all_of(metrics)) %>%
-      pivot_longer(cols=Accuracy:epsilon,names_to = "Metric",values_to = "Value")
+      pivot_longer(cols=Accuracy:Power,names_to = "Metric",values_to = "Value")
   if("delta" %in% metrics){
    toplot$Metric[which(toplot$Metric == "delta")] <-'\u03B4'
   }
@@ -167,7 +187,7 @@ plot_accuracy <- function(table,metrics=c("Accuracy","Precision","Recall","Fscor
   plottype <- plottype[1]
   if(plottype=="ggplot"){
     plot<- toplot %>% 
-      ggplot(.,aes(x=n,y=Value,col=Metric)) + geom_line() 
+      ggplot(.,aes(x=n,y=Value,col=Metric,linetype=Metric)) + geom_line() 
   } else if(plottype=="plotly"){
     plot <- plot_ly(toplot, x= ~n, y = ~Value, color = ~Metric, mode = 'lines') %>%
       layout(yaxis = list(title= ""), legend = list(orientation = ''))  #TODO - add ability to change plotly options
