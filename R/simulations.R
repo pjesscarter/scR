@@ -1,3 +1,64 @@
+#' Utility function to generate accuracy metrics, for use with [estimate_accuracy()]
+#'
+#' @param n An integer giving the desired sample size for which the target function is to be calculated.
+#' @param ... Additional model parameters to be specified by the user.
+#' @return A data frame giving performance metrics for the specified sample size.
+
+acc_sim <- function(n,...){
+  accuracy <- vector()
+  prec <- vector()
+  rec <- vector()
+  fscore <- vector()
+  pwr <- vector()
+  for(j in seq_len(nsample)){
+    skip <- T
+    while(skip){
+      skip <- F
+      indices <- sample(seq_len(nrow(dat)),n)
+      samp <- dat[indices,]
+      error <- rbinom(nrow(samp),1,eta)
+      if(is.factor(samp[[outcome]])){
+        samp$outobs <- factor(ifelse(error,!as.numeric(as.character(samp[[outcome]])),as.numeric(as.character(samp[[outcome]]))),levels=c("0","1"))
+      } else{
+        samp$outobs <- factor(ifelse(error,!samp[[outcome]],samp[[outcome]]),levels=c("0","1"))
+      }
+      samp <- samp %>% select(!all_of(outcome))
+      m <- tryCatch({model(outobs ~.,data=samp,...
+      )},
+      error=function(e){
+        warning("Model failed to compute, regenerating training data")
+        skip <<- T} #TODO - provide useful error message to help diagnose misuse
+      )
+    }
+    pred <- suppressWarnings({predict(m,dat %>% select(!all_of(outcome)))})
+    accuracy[j] <- mean(as.numeric(levels(pred)[pred])== factor(dat[[outcome]],levels=c("0","1")))
+    prec[j] <- tryCatch({precision(table(levels(pred)[pred],factor(dat[[outcome]],levels=c("0","1"))), relevant = 1)},
+                        error = function(e){return(NA)})
+    rec[j] <- tryCatch({recall(table(levels(pred)[pred],factor(dat[[outcome]],levels=c("0","1"))), relevant = 1)},
+                       error = function(e){return(NA)})
+    fscore[j] <- tryCatch({F_meas(table(levels(pred)[pred],factor(dat[[outcome]],levels=c("0","1"))), relevant = 1)},
+                          error = function(e){return(NA)})
+    
+    if(power){
+      reject <- vector()
+      Dobs <- as.numeric(levels(pred)[pred])
+      Dtrue <- if(is.factor(dat[[outcome]])){as.numeric(as.character(dat[[outcome]]))} else{dat[[outcome]]}
+      for(r in 1:powersims){
+        Y <- effect_size * Dtrue + rnorm(length(Dobs))
+        X <- data.frame(D = Dobs, Y = Y)
+        mdl <- lm(Y ~ D, data=X)
+        reject[r] <- tryCatch({summary(mdl)$coefficients[2,4] < alpha},
+                              error = function(e){return(NA)})
+      }
+      pwr[j] <- mean(reject,na.rm=T)
+      
+    } else{pwr[j] <- NA}
+    
+  }
+  out <- tryCatch({data.frame(accuracy,prec,rec,fscore,n,pwr)},
+                  error = function(e){return(NA)})
+  return(out)
+}
 #' Estimate sample complexity bounds for a binary classification algorithm using either simulated or user-supplied data.
 #'
 #' @param formula A `formula` that can be passed to the `model` argument to define the classification algorithm
@@ -5,6 +66,7 @@
 #' @param data Optional. A rectangular `data.frame` object giving the full data from which samples are to be drawn. If left unspecified, [gendata()] is called to produce synthetic data with an appropriate structure.
 #' @param dim Required if `data` is unspecified. Gives the horizontal dimension of the data (number of predictor variables) to be generated.
 #' @param maxn Required if `data` is unspecified. Gives the vertical dimension of the data (number of observations) to be generated.
+#' @param upperlimit Optional. A positive integer giving the maximum sample size to be simulated, if data was supplied.
 #' @param nsample A positive integer giving the number of samples to be generated for each value of $n$. Larger values give more accurate results.
 #' @param steps A positive integer giving the number of values of $n$ for which simulations should be conducted. Larger values give more accurate results.
 #' @param eta A real number between 0 and 1 giving the probability of misclassification error in the training data.
@@ -15,6 +77,8 @@
 #' @param effect_size If `power` is `TRUE`, a real number indicating the scaled effect size the user would like to be able to detect.
 #' @param powersims If `power` is `TRUE`, an integer indicating the number of simulations to be conducted at each step to calculate power.
 #' @param alpha If `power` is `TRUE`, a real number between 0 and 1 indicating the probability of Type I error to be used for hypothesis testing. Default is 0.05.
+#' @param parallel Boolean indicating whether or not to use parallel processing. 
+#' @param coreoffset If `parallel` is true, a positive integer indicating the number of free threads to be kept unused. Should not be larger than the number of CPU cores.
 #' @param ... Additional arguments that need to be passed to `model`
 #' @return A `list` containing two named elements. `Raw` gives the exact output of the simulations, while `Summary` gives a table of accuracy metrics, including the achieved levels of $\epsilon$ and $\delta$ given the specified values. Alternative values can be calculated using [getpac()]
 #' @seealso [plot_accuracy()], to represent simulations visually, [getpac()], to calculate summaries for alternate values of $\epsilon$ and $\delta$ without conducting a new simulation, and [gendata()], to generated synthetic datasets.
@@ -36,7 +100,7 @@
 #' @export
 
 
-estimate_accuracy <- function(formula, model, data=NULL, dim=NULL,maxn=NULL,nsample= 30, steps= 50,eta=0.05,delta=0.05,epsilon=0.05, predictfn = NULL,power = F,effect_size=NULL,powersims=NULL,alpha=0.05,...){
+estimate_accuracy <- function(formula, model, data=NULL, dim=NULL,maxn=NULL,upperlimit=NULL,nsample= 30, steps= 50,eta=0.05,delta=0.05,epsilon=0.05, predictfn = NULL,power = F,effect_size=NULL,powersims=NULL,alpha=0.05,parallel = T,coreoffset=0,packages=list(),...){
   if(is.null(data)){
     names <- all.vars(formula)
     data <- gendata(model,dim,maxn,predictfn,names,...)
@@ -45,64 +109,28 @@ estimate_accuracy <- function(formula, model, data=NULL, dim=NULL,maxn=NULL,nsam
   outcome <- all.vars(formula)[1]
   dat <- model.frame(formula,data)
   #nvalues <- seq(4,300,15)
-  nvalues <- seq((ncol(dat)+1),nrow(dat),steps)
-  if(!is.null(predictfn)){
-    predict.svrclass <- predictfn
-  }
+  nvalues <- seq((ncol(dat)+1),ifelse(is.null(upperlimit),nrow(dat),upperlimit),steps)
+  # if(!is.null(predictfn)){
+  #   predict.svrclass <- predictfn
+  # }
   ####function printing out the minimum sample size that achieves the highest accuracy
-  for(i in seq_along(nvalues)){
-    n <- nvalues[i]
-    accuracy <- vector()
-    prec <- vector()
-    rec <- vector()
-    fscore <- vector()
-    pwr <- vector()
-    for(j in seq_len(nsample)){
-      skip <- T
-      while(skip){
-        skip <- F
-        indices <- sample(seq_len(nrow(dat)),n)
-        samp <- dat[indices,]
-        error <- rbinom(nrow(samp),1,eta)
-        if(is.factor(samp[[outcome]])){
-          samp$outobs <- factor(ifelse(error,!as.numeric(as.character(samp[[outcome]])),as.numeric(as.character(samp[[outcome]]))),levels=c("0","1"))
-        } else{
-          samp$outobs <- factor(ifelse(error,!samp[[outcome]],samp[[outcome]]),levels=c("0","1"))
-        }
-        samp <- samp %>% select(!all_of(outcome))
-        m <- tryCatch({model(outobs ~.,data=samp,...
-                             )},
-                       error=function(e){
-                         warning("Model failed to compute, regenerating training data")
-                         skip <<- T} #TODO - provide useful error message to help diagnose misuse
-        )
-      }
-      pred <- suppressWarnings({predict(m,dat %>% select(!all_of(outcome)))})
-      accuracy[j] <- mean(as.numeric(levels(pred)[pred])== factor(dat[[outcome]],levels=c("0","1")))
-      prec[j] <- tryCatch({precision(table(levels(pred)[pred],factor(dat[[outcome]],levels=c("0","1"))), relevant = 1)},
-                          error = function(e){return(NA)})
-      rec[j] <- tryCatch({recall(table(levels(pred)[pred],factor(dat[[outcome]],levels=c("0","1"))), relevant = 1)},
-                         error = function(e){return(NA)})
-      fscore[j] <- tryCatch({F_meas(table(levels(pred)[pred],factor(dat[[outcome]],levels=c("0","1"))), relevant = 1)},
-                            error = function(e){return(NA)})
-      
-      if(power){
-        reject <- vector()
-        Dobs <- as.numeric(levels(pred)[pred])
-        Dtrue <- if(is.factor(dat[[outcome]])){as.numeric(as.character(dat[[outcome]]))} else{dat[[outcome]]}
-        for(r in 1:powersims){
-          Y <- effect_size * Dtrue + rnorm(length(Dobs))
-          X <- data.frame(D = Dobs, Y = Y)
-          mdl <- lm(Y ~ D, data=X)
-          reject[r] <- summary(mdl)$coefficients[2,4] < alpha
-        }
-        pwr[j] <- mean(reject)
-      } else{pwr[j] <- NA}
-      
-    }
-    results[[i]] <- tryCatch({data.frame(accuracy,prec,rec,fscore,n,pwr)},
-                             error = function(e){return(NA)})
+  if(parallel){
+    cl <- detectCores() -coreoffset
+    cl <- makeCluster(cl)
+  } else{
+    cl <- 1
+    cl <- makeCluster(cl)
   }
+  clusterExport(cl,varlist = c("dat","model","eta","packages","predictfn","nsample","outcome","power","effect_size","powersims","alpha"),envir = environment())
+  clusterEvalQ(cl=cl,expr={
+    library(dplyr)
+    lapply(packages, library, character.only = TRUE)
+    if(!is.null(predictfn)){
+      predict.svrclass <- predictfn
+    }
+  })
+  results <-   suppressWarnings({pblapply(nvalues,acc_sim,cl=cl)})
+  stopCluster(cl)
   results <- bind_rows(results)
   summtable <- results %>% group_by(n) %>% summarise(Accuracy = mean(accuracy,na.rm=T), 
                                                      Precision = mean(prec,na.rm=T), 
