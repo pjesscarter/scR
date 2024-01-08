@@ -3,7 +3,7 @@
 #' @param n An integer giving the desired sample size for which the target function is to be calculated.
 #' @param ... Additional model parameters to be specified by the user.
 #' @return A data frame giving performance metrics for the specified sample size.
-
+#' @export
 acc_sim <- function(n,...){
   accuracy <- vector()
   prec <- vector()
@@ -124,6 +124,7 @@ estimate_accuracy <- function(formula, model, data=NULL, dim=NULL,maxn=NULL,uppe
   clusterExport(cl,varlist = c("dat","model","eta","packages","predictfn","nsample","outcome","power","effect_size","powersims","alpha"),envir = environment())
   clusterEvalQ(cl=cl,expr={
     library(dplyr)
+    library(caret)
     lapply(packages, library, character.only = TRUE)
     if(!is.null(predictfn)){
       predict.svrclass <- predictfn

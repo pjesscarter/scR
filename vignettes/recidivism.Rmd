@@ -125,10 +125,11 @@ results <- estimate_accuracy(formula=two_year_recid ~ race + sex + age + juv_fel
                              alpha=0.05)
 ```
 ```{r,warning=FALSE}
+polyarchydata <- data %>% select(cont,part,polytrue) %>% unique()
 results <- estimate_accuracy(formula=polytrue ~ cont + part,
                              model=mylogit,
-                             data = data,
-                             nsample = 1000,
+                             data = polyarchydata,
+                              nsample = 1000,
                              upperlimit = 500,
                              steps=50,
                              predictfn = mypred,
@@ -137,7 +138,7 @@ results <- estimate_accuracy(formula=polytrue ~ cont + part,
                              powersims=1000,
                              alpha=0.05,
                              parallel = T,
-                             coreoffset = 1)
+                             coreoffset = 2)
 plot_accuracy(results)
 ```
 
