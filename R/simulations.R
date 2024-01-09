@@ -174,7 +174,8 @@ getpac <- function(table,epsilon=0.05,delta=0.05){
                                                      Recall = mean(rec,na.rm=T),
                                                      Fscore = mean(fscore,na.rm=T),
                                                      delta = mean((1-accuracy) > epsilon,na.rm=T),
-                                                     epsilon = quantile(1-accuracy,1-delta,na.rm=T))
+                                                     epsilon = quantile(1-accuracy,1-delta,na.rm=T),
+                                                     Power = mean(pwr,na.rm=T))
   return(list("Raw"=results,"Summary"=summtable))
 }
 #' Represent simulated sample complexity bounds graphically
