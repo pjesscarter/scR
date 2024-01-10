@@ -130,15 +130,15 @@ results <- estimate_accuracy(formula=polytrue ~ cont + part,
                              model=mylogit,
                              data = polyarchydata,
                               nsample = 1000,
-                             upperlimit = 500,
-                             steps=100,
+                             upperlimit = 1000,
+                             steps = 20,
                              predictfn = mypred,
                              power = T,
                              effect_size=0.5,
                              powersims=1000,
                              alpha=0.05,
                              parallel = T,
-                             coreoffset = 4)
+                             coreoffset = 2)
 res2 <- getpac(results,delta = 0.01,epsilon=0.05) 
 plot_accuracy(res2,plottype="plotly")
 ```

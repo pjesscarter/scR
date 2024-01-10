@@ -137,8 +137,8 @@ estimate_accuracy <- function(formula, model, data=NULL, dim=NULL,maxn=NULL,uppe
                                                      Precision = mean(prec,na.rm=T), 
                                                      Recall = mean(rec,na.rm=T),
                                                      Fscore = mean(fscore,na.rm=T),
-                                                     delta = mean((1-accuracy) > epsilon,na.rm=T),
-                                                     epsilon = quantile(1-accuracy,1-delta,na.rm=T),
+                                                     Delta = mean((1-accuracy) > epsilon,na.rm=T),
+                                                     Epsilon = quantile((1-accuracy),(1-delta),na.rm=T),
                                                      Power = mean(pwr,na.rm=T))
   return(list("Raw"=results,"Summary"=summtable))
 }
@@ -173,8 +173,8 @@ getpac <- function(table,epsilon=0.05,delta=0.05){
                                                      Precision = mean(prec,na.rm=T), 
                                                      Recall = mean(rec,na.rm=T),
                                                      Fscore = mean(fscore,na.rm=T),
-                                                     delta = mean((1-accuracy) > epsilon,na.rm=T),
-                                                     epsilon = quantile(1-accuracy,1-delta,na.rm=T),
+                                                     Delta = mean((1-accuracy) > (epsilon),na.rm=T),
+                                                     Epsilon = quantile((1-accuracy),(1-delta),na.rm=T),
                                                      Power = mean(pwr,na.rm=T))
   return(list("Raw"=results,"Summary"=summtable))
 }
@@ -203,16 +203,16 @@ getpac <- function(table,epsilon=0.05,delta=0.05){
 #' fig <- plot_accuracy(results)
 #' fig
 #' @export
-plot_accuracy <- function(table,metrics=c("Accuracy","Precision","Recall","Fscore","delta","epsilon","Power"),plottype = c("ggplot","plotly")){
+plot_accuracy <- function(table,metrics=c("Accuracy","Precision","Recall","Fscore","Delta","Epsilon","Power"),plottype = c("ggplot","plotly")){
   
   toplot <- table$Summary %>% 
    select(n,all_of(metrics)) %>%
       pivot_longer(cols=Accuracy:Power,names_to = "Metric",values_to = "Value")
-  if("delta" %in% metrics){
-   toplot$Metric[which(toplot$Metric == "delta")] <-'\u03B4'
+  if("Delta" %in% metrics){
+   toplot$Metric[which(toplot$Metric == "Delta")] <-'\u03B4'
   }
-  if("epsilon" %in% metrics){
-    toplot$Metric[which(toplot$Metric == "epsilon")] <-'\u03B5'
+  if("Epsilon" %in% metrics){
+    toplot$Metric[which(toplot$Metric == "Epsilon")] <-'\u03B5'
   }
   plottype <- plottype[1]
   if(plottype=="ggplot"){

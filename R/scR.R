@@ -140,7 +140,7 @@ simvcd <- function(model,dim,packages=list(),m=1000,k=1000,maxn=5000,parallel = 
   })
   #Need to work on passing function arguments with pbapply - some issues around parallelization
   xihats <- suppressWarnings({pbsapply(ngrid,risk_bounds,...,cl=cl)})
-  stopCluster(cl)
+  res2stopCluster(cl)
   vcd <- optim((l+1),loss,ngrid=ngrid,xi=xihats, , a=a,a1=a1,a11=a11, method="Brent",lower=1,upper = 2*(max(ngrid)), ...)
   return(vcd$par)
 }
