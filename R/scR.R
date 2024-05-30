@@ -1,6 +1,3 @@
-#Does not need to be user-facing
-#Works for any function that uses formula+data interface
-#TODO - add support for custom helper function to prepare data for use
 
 
 #' Utility function to generate data points for estimation of the VC Dimension of a user-specified binary classification algorithm given a specified sample size.
@@ -33,7 +30,6 @@ risk_bounds <- function(x,...){
     while(skip){
       skip <- F
       x <- replicate(l,rnorm(2*n))
-      #In theory the complexity of the target concept is irrelevant - is this true?
       coeff <- rnorm(l)
       y <- as.numeric(apply(x,1,FUN=function(r){r %*% coeff}) > 0)
       dat <- data.frame(x,y)

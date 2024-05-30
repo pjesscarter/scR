@@ -1,6 +1,7 @@
 #' Utility function to generate accuracy metrics, for use with [estimate_accuracy()]
 #'
 #' @param n An integer giving the desired sample size for which the target function is to be calculated.
+#' @param method A character vector specifying the method to be used to generate the data. Default is i.i.d. uniform sampling.
 #' @param ... Additional model parameters to be specified by the user.
 #' @return A data frame giving performance metrics for the specified sample size.
 #' @export
