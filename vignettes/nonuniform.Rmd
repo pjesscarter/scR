@@ -1,0 +1,38 @@
+---
+title: "Nonuniform Bounds"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Nonuniform}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r, include=FALSE}
+devtools::load_all()
+library(parallel)
+library(pbapply)
+library(caret)
+library(ggplot2)
+library(plotly)
+library(dplyr)
+library(tidyr)
+```
+```{r setup}
+
+library(scR)
+```
+
+# Simulating VC Dimension
+
+When estimating bounds, we can avoid specifying the dataset, allowing the built-in `gendata` function to automatically benchmark synthetic data with the appropriate dimensionality. The theoretical bounds are distribution-free in the sense that they hold regardless of the probabilities assigned to training examples. This vignette demonstrates the significance of this property through simulation.
+
+```{r,warning=FALSE}
+results <- estimate_accuracy(two_year_recid ~ race + sex + age + juv_fel_count + juv_misd_count + priors_count + charge_degree..misd.fel.,mylogit,maxn=nrow(br),dim=7,predictfn = mypred)
+```
