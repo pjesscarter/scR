@@ -3,10 +3,11 @@
 #' @param n An integer giving the desired sample size for which the target function is to be calculated.
 #' @param method An optional string stating the distribution from which data is to be generated. Default is i.i.d. uniform sampling. Currently also supports "Class Imbalance". Can also take a function outputting a vector of probabilities if the user wishes to specify a custom distribution.
 #' @param p If method is 'Class Imbalance', gives the degree of weight placed on the positive class.
+#' @param ntest An integer giving the size of the test set to be drawn.
 #' @param ... Additional model parameters to be specified by the user.
 #' @return A data frame giving performance metrics for the specified sample size.
 #' @export
-acc_sim <- function(n,method = "Uniform",p=NULL,...){
+acc_sim <- function(n,method = "Uniform",p=NULL,ntest=1000,...){
   accuracy <- vector()
   prec <- vector()
   rec <- vector()
@@ -25,12 +26,12 @@ acc_sim <- function(n,method = "Uniform",p=NULL,...){
           stop("Class Imbalance method selected. Please supply a class imbalance parameter.")
         }
         probs <- ifelse(dat[[outcome]]==1,p,(1-p))
-        indices <- sample(seq_len(nrow(dat)),n,prob=probs)
+        indices <- sample(seq_len(nrow(dat)),n,replace=T,prob=probs)
         samp <- dat[indices,]
         error <- rbinom(nrow(samp),1,eta)
       } else{
         probs <- method(dat)
-        indices <- sample(seq_len(nrow(dat)),n,prob=probs)
+        indices <- sample(seq_len(nrow(dat)),n,replace=T,prob=probs)
         samp <- dat[indices,]
         error <- rbinom(nrow(samp),1,eta)
       }
@@ -48,19 +49,34 @@ acc_sim <- function(n,method = "Uniform",p=NULL,...){
         skip <<- T} #TODO - provide useful error message to help diagnose misuse
       )
     }
-    pred <- suppressWarnings({predict(m,dat %>% select(!all_of(outcome)))})
-    accuracy[j] <- mean(as.numeric(levels(pred)[pred])== factor(dat[[outcome]],levels=c("0","1")))
-    prec[j] <- tryCatch({precision(table(levels(pred)[pred],factor(dat[[outcome]],levels=c("0","1"))), relevant = 1)},
+    if(method=="Uniform"){
+      indices <- sample(seq_len(nrow(dat)),ntest)
+      test <- dat[indices,] %>% select(!all_of(outcome))
+      eval <- dat[indices,]
+    } else if(method=="Class Imbalance"){
+      probs <- ifelse(dat[[outcome]]==1,p,(1-p))
+      indices <- sample(seq_len(nrow(dat)),ntest,replace=T,prob=probs)
+      test <- dat[indices,] %>% select(!all_of(outcome))
+      eval <- dat[indices,]
+    } else{
+      probs <- method(dat)
+      indices <- sample(seq_len(nrow(dat)),ntest,replace=T,prob=probs)
+      test <- dat[indices,] %>% select(!all_of(outcome))
+      eval <- dat[indices,]
+    }
+    pred <- suppressWarnings({predict(m,test)})
+    accuracy[j] <- mean(as.numeric(levels(pred)[pred])== factor(eval[[outcome]],levels=c("0","1")))
+    prec[j] <- tryCatch({precision(table(levels(pred)[pred],factor(eval[[outcome]],levels=c("0","1"))), relevant = 1)},
                         error = function(e){return(NA)})
-    rec[j] <- tryCatch({recall(table(levels(pred)[pred],factor(dat[[outcome]],levels=c("0","1"))), relevant = 1)},
+    rec[j] <- tryCatch({recall(table(levels(pred)[pred],factor(eval[[outcome]],levels=c("0","1"))), relevant = 1)},
                        error = function(e){return(NA)})
-    fscore[j] <- tryCatch({F_meas(table(levels(pred)[pred],factor(dat[[outcome]],levels=c("0","1"))), relevant = 1)},
+    fscore[j] <- tryCatch({F_meas(table(levels(pred)[pred],factor(eval[[outcome]],levels=c("0","1"))), relevant = 1)},
                           error = function(e){return(NA)})
     
     if(power){
       reject <- vector()
       Dobs <- as.numeric(levels(pred)[pred])
-      Dtrue <- if(is.factor(dat[[outcome]])){as.numeric(as.character(dat[[outcome]]))} else{dat[[outcome]]}
+      Dtrue <- if(is.factor(eval[[outcome]])){as.numeric(as.character(eval[[outcome]]))} else{eval[[outcome]]}
       for(r in 1:powersims){
         Y <- effect_size * Dtrue + rnorm(length(Dobs))
         X <- data.frame(D = Dobs, Y = Y)
@@ -100,6 +116,7 @@ acc_sim <- function(n,method = "Uniform",p=NULL,...){
 #' @param packages A list of packages that need to be loaded in order to run `model`.
 #' @param method An optional string stating the distribution from which data is to be generated. Default is i.i.d. uniform sampling. Can also take a function outputting a vector of probabilities if the user wishes to specify a custom distribution.
 #' @param p If method is 'Class Imbalance', gives the degree of weight placed on the positive class.
+#' @param ntest An integer giving the size of the test set to be drawn.
 #' @param ... Additional arguments that need to be passed to `model`
 #' @return A `list` containing two named elements. `Raw` gives the exact output of the simulations, while `Summary` gives a table of accuracy metrics, including the achieved levels of $\epsilon$ and $\delta$ given the specified values. Alternative values can be calculated using [getpac()]
 #' @seealso [plot_accuracy()], to represent simulations visually, [getpac()], to calculate summaries for alternate values of $\epsilon$ and $\delta$ without conducting a new simulation, and [gendata()], to generated synthetic datasets.
@@ -121,7 +138,7 @@ acc_sim <- function(n,method = "Uniform",p=NULL,...){
 #' @export
 
 
-estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,upperlimit=NULL,nsample= 30, steps= 50,eta=0.05,delta=0.05,epsilon=0.05,predictfn = NULL,power = F,effect_size=NULL,powersims=NULL,alpha=0.05,parallel = T,coreoffset=0,packages=list(),method = c("Uniform","Class Imbalance"),p=NULL,...){
+estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,upperlimit=NULL,nsample= 30, steps= 50,eta=0.05,delta=0.05,epsilon=0.05,predictfn = NULL,power = F,effect_size=NULL,powersims=NULL,alpha=0.05,parallel = T,coreoffset=0,packages=list(),method = c("Uniform","Class Imbalance"),p=NULL,ntest=1000,...){
   if(is.null(data)){
     names <- all.vars(formula)
     data <- gendata(model,dim,maxn,predictfn,names,...)
@@ -151,7 +168,7 @@ estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,upper
       predict.svrclass <- predictfn
     }
   })
-  results <-   suppressWarnings({pblapply(nvalues,acc_sim,method,p,cl=cl)})
+  results <-   suppressWarnings({pblapply(nvalues,acc_sim,method,p,ntest,cl=cl)})
   stopCluster(cl)
   results <- bind_rows(results)
   summtable <- results %>% group_by(n) %>% summarise(Accuracy = mean(accuracy,na.rm=T), 

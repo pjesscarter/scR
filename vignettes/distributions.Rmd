@@ -52,7 +52,7 @@ br <- scR::br
 pvalues <- c(0.5,0.25,0.1,0.01,0.001)
 results <- list()
 for(i in 1:length(pvalues)){
-  results[[i]] <- estimate_accuracy(two_year_recid ~ race + sex + age + juv_fel_count + juv_misd_count + priors_count + charge_degree..misd.fel.,mylogit,maxn=nrow(br),dim=7,predictfn = mypred,method = "Class Imbalance", p = pvalues[i])
+  results[[i]] <- estimate_accuracy(two_year_recid ~ race + sex + age + juv_fel_count + juv_misd_count + priors_count + charge_degree..misd.fel.,mylogit,maxn=nrow(br),dim=7,predictfn = mypred,method = "Class Imbalance", p = pvalues[i],nsample = 100)
 }
 ```
 
