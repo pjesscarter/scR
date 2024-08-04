@@ -4,10 +4,11 @@
 #' @param method An optional string stating the distribution from which data is to be generated. Default is i.i.d. uniform sampling. Currently also supports "Class Imbalance". Can also take a function outputting a vector of probabilities if the user wishes to specify a custom distribution.
 #' @param p If method is 'Class Imbalance', gives the degree of weight placed on the positive class.
 #' @param ntest An integer giving the size of the test set to be drawn.
+#' @param rtest An integer giving the number of the test sets to be drawn.
 #' @param ... Additional model parameters to be specified by the user.
 #' @return A data frame giving performance metrics for the specified sample size.
 #' @export
-acc_sim <- function(n,method = "Uniform",p=NULL,ntest=1000,...){
+acc_sim <- function(n,method = "Uniform",p=NULL,ntest=1000,rtest=100,...){
   accuracy <- vector()
   prec <- vector()
   rec <- vector()
@@ -42,53 +43,65 @@ acc_sim <- function(n,method = "Uniform",p=NULL,ntest=1000,...){
         samp$outobs <- factor(ifelse(error,!samp[[outcome]],samp[[outcome]]),levels=c("0","1"))
       }
       samp <- samp %>% select(!all_of(outcome))
-      m <- tryCatch({model(outobs ~.,data=samp,...
+      m <- tryCatch({model(update(formula, outobs~.),data=samp#,...
       )},
       error=function(e){
         warning("Model failed to compute, regenerating training data")
         skip <<- T} #TODO - provide useful error message to help diagnose misuse
       )
     }
-    if(method=="Uniform"){
-      indices <- sample(seq_len(nrow(dat)),ntest)
-      test <- dat[indices,] %>% select(!all_of(outcome))
-      eval <- dat[indices,]
-    } else if(method=="Class Imbalance"){
-      probs <- ifelse(dat[[outcome]]==1,p,(1-p))
-      indices <- sample(seq_len(nrow(dat)),ntest,replace=T,prob=probs)
-      test <- dat[indices,] %>% select(!all_of(outcome))
-      eval <- dat[indices,]
-    } else{
-      probs <- method(dat)
-      indices <- sample(seq_len(nrow(dat)),ntest,replace=T,prob=probs)
-      test <- dat[indices,] %>% select(!all_of(outcome))
-      eval <- dat[indices,]
-    }
-    pred <- suppressWarnings({predict(m,test)})
-    accuracy[j] <- mean(as.numeric(levels(pred)[pred])== factor(eval[[outcome]],levels=c("0","1")))
-    prec[j] <- tryCatch({precision(table(levels(pred)[pred],factor(eval[[outcome]],levels=c("0","1"))), relevant = 1)},
-                        error = function(e){return(NA)})
-    rec[j] <- tryCatch({recall(table(levels(pred)[pred],factor(eval[[outcome]],levels=c("0","1"))), relevant = 1)},
-                       error = function(e){return(NA)})
-    fscore[j] <- tryCatch({F_meas(table(levels(pred)[pred],factor(eval[[outcome]],levels=c("0","1"))), relevant = 1)},
-                          error = function(e){return(NA)})
-    
-    if(power){
-      reject <- vector()
-      Dobs <- as.numeric(levels(pred)[pred])
-      Dtrue <- if(is.factor(eval[[outcome]])){as.numeric(as.character(eval[[outcome]]))} else{eval[[outcome]]}
-      for(r in 1:powersims){
-        Y <- effect_size * Dtrue + rnorm(length(Dobs))
-        X <- data.frame(D = Dobs, Y = Y)
-        mdl <- lm(Y ~ D, data=X)
-        reject[r] <- tryCatch({summary(mdl)$coefficients[2,4] < alpha},
-                              error = function(e){return(NA)})
+    accuracyk <- vector()
+    preck <- vector()
+    reck <- vector()
+    fscorek <- vector()
+    pwrk <- vector()
+    for(k in seq_len(rtest)){
+
+      if(method=="Uniform"){
+        indices <- sample(seq_len(nrow(dat)),ntest)
+        test <- dat[indices,] %>% select(!all_of(outcome))
+        eval <- dat[indices,]
+      } else if(method=="Class Imbalance"){
+        probs <- ifelse(dat[[outcome]]==1,p,(1-p))
+        indices <- sample(seq_len(nrow(dat)),ntest,replace=T,prob=probs)
+        test <- dat[indices,] %>% select(!all_of(outcome))
+        eval <- dat[indices,]
+      } else{
+        probs <- method(dat)
+        indices <- sample(seq_len(nrow(dat)),ntest,replace=T,prob=probs)
+        test <- dat[indices,] %>% select(!all_of(outcome))
+        eval <- dat[indices,]
       }
-      pwr[j] <- mean(reject,na.rm=T)
+      pred <- suppressWarnings({predict(m,test)})
+      accuracyk[k] <- mean(as.numeric(levels(pred)[pred])== factor(eval[[outcome]],levels=c("0","1")))
+      preck[k] <- tryCatch({precision(table(levels(pred)[pred],factor(eval[[outcome]],levels=c("0","1"))), relevant = 1)},
+                          error = function(e){return(NA)})
+      reck[k] <- tryCatch({recall(table(levels(pred)[pred],factor(eval[[outcome]],levels=c("0","1"))), relevant = 1)},
+                         error = function(e){return(NA)})
+      fscorek[k] <- tryCatch({F_meas(table(levels(pred)[pred],factor(eval[[outcome]],levels=c("0","1"))), relevant = 1)},
+                            error = function(e){return(NA)})
       
-    } else{pwr[j] <- NA}
-    
-  }
+      if(power){
+        reject <- vector()
+        Dobs <- as.numeric(levels(pred)[pred])
+        Dtrue <- if(is.factor(eval[[outcome]])){as.numeric(as.character(eval[[outcome]]))} else{eval[[outcome]]}
+        for(r in 1:powersims){
+          Y <- effect_size * Dtrue + rnorm(length(Dobs))
+          X <- data.frame(D = Dobs, Y = Y)
+          mdl <- lm(Y ~ D, data=X)
+          reject[r] <- tryCatch({summary(mdl)$coefficients[2,4] < alpha},
+                                error = function(e){return(NA)})
+        }
+        pwrk[k] <- mean(reject,na.rm=T)
+        
+      } else{pwrk[k] <- NA}
+    }
+    accuracy[j] <- mean(accuracyk, na.rm=T)
+    prec[j] <- mean(preck, na.rm=T)
+    rec[j] <- mean(reck, na.rm=T)
+    fscore[j] <- mean(fscorek, na.rm=T)
+    pwr[j] <- mean(pwrk, na.rm=T)
+    }      
   out <- tryCatch({data.frame(accuracy,prec,rec,fscore,n,pwr)},
                   error = function(e){return(NA)})
   return(out)
@@ -117,6 +130,7 @@ acc_sim <- function(n,method = "Uniform",p=NULL,ntest=1000,...){
 #' @param method An optional string stating the distribution from which data is to be generated. Default is i.i.d. uniform sampling. Can also take a function outputting a vector of probabilities if the user wishes to specify a custom distribution.
 #' @param p If method is 'Class Imbalance', gives the degree of weight placed on the positive class.
 #' @param ntest An integer giving the size of the test set to be drawn.
+#' @param rtest An integer giving the number of the test sets to be drawn.
 #' @param ... Additional arguments that need to be passed to `model`
 #' @return A `list` containing two named elements. `Raw` gives the exact output of the simulations, while `Summary` gives a table of accuracy metrics, including the achieved levels of $\epsilon$ and $\delta$ given the specified values. Alternative values can be calculated using [getpac()]
 #' @seealso [plot_accuracy()], to represent simulations visually, [getpac()], to calculate summaries for alternate values of $\epsilon$ and $\delta$ without conducting a new simulation, and [gendata()], to generated synthetic datasets.
@@ -138,7 +152,7 @@ acc_sim <- function(n,method = "Uniform",p=NULL,ntest=1000,...){
 #' @export
 
 
-estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,upperlimit=NULL,nsample= 30, steps= 50,eta=0.05,delta=0.05,epsilon=0.05,predictfn = NULL,power = F,effect_size=NULL,powersims=NULL,alpha=0.05,parallel = T,coreoffset=0,packages=list(),method = c("Uniform","Class Imbalance"),p=NULL,ntest=1000,...){
+estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,upperlimit=NULL,nsample= 30, steps= 50,eta=0.05,delta=0.05,epsilon=0.05,predictfn = NULL,power = F,effect_size=NULL,powersims=NULL,alpha=0.05,parallel = T,coreoffset=0,packages=list(),method = "Uniform",p=NULL,ntest=1000,rtest=100,...){
   if(is.null(data)){
     names <- all.vars(formula)
     data <- gendata(model,dim,maxn,predictfn,names,...)
@@ -159,7 +173,7 @@ estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,upper
     cl <- 1
     cl <- makeCluster(cl)
   }
-  clusterExport(cl,varlist = c("dat","model","eta","packages","predictfn","nsample","outcome","power","effect_size","powersims","alpha"),envir = environment())
+  clusterExport(cl,varlist = c("formula","dat","model","eta","packages","predictfn","nsample","outcome","power","effect_size","powersims","alpha"),envir = environment())
   clusterEvalQ(cl=cl,expr={
     library(dplyr)
     library(caret)
@@ -168,7 +182,7 @@ estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,upper
       predict.svrclass <- predictfn
     }
   })
-  results <-   suppressWarnings({pblapply(nvalues,acc_sim,method,p,ntest,cl=cl)})
+  results <-   suppressWarnings({pblapply(nvalues,acc_sim,method,p,ntest,rtest,cl=cl)})
   stopCluster(cl)
   results <- bind_rows(results)
   summtable <- results %>% group_by(n) %>% summarise(Accuracy = mean(accuracy,na.rm=T), 

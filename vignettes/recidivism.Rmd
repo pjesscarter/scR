@@ -82,7 +82,7 @@ The package also provides utility for users to directly estimate accuracy given 
 
 ```{r,warning=FALSE}
 br <- scR::br
-results <- estimate_accuracy(two_year_recid ~ race + sex + age + juv_fel_count + juv_misd_count + priors_count + charge_degree..misd.fel.,mylogit,br,predictfn = mypred)
+results <- estimate_accuracy(two_year_recid ~ race + sex + age + juv_fel_count + juv_misd_count + priors_count + charge_degree..misd.fel.,mylogit,br,predictfn = mypred,nsample = 1000)
 ```
 
 The `plot_accuracy` function also provides a useful helper to quickly display the results of the simulation graphically using either the `ggplot2` or `plotly` libraries:
@@ -125,21 +125,23 @@ results <- estimate_accuracy(formula=two_year_recid ~ race + sex + age + juv_fel
                              alpha=0.05)
 ```
 ```{r,warning=FALSE}
-polyarchydata <- data %>% select(cont,part,polytrue) %>% unique()
-results <- estimate_accuracy(formula=polytrue ~ cont + part,
+polyarchydata <- scR::data %>% select(cont,part,polytrue) %>% unique()
+results <- estimate_accuracy(formula=polytrue ~ cont*part,
                              model=mylogit,
                              data = polyarchydata,
-                              nsample = 1000,
+                              nsample = 100,
                              upperlimit = 1000,
-                             steps = 20,
+                             steps = 10,
                              predictfn = mypred,
                              power = T,
                              effect_size=0.5,
-                             powersims=1000,
+                             powersims=100,
                              alpha=0.05,
                              parallel = T,
-                             coreoffset = 2)
-res2 <- getpac(results,delta = 0.01,epsilon=0.05) 
+                             coreoffset = 0,
+                             rtest=10,
+                             method = "Class Imbalance", p = 0.75)
+res2 <- getpac(results,delta = 0.01,epsilon=0.1) 
 plot_accuracy(res2,plottype="plotly")
 ```
 
