@@ -5,6 +5,9 @@
 #' @param p If method is 'Class Imbalance', gives the degree of weight placed on the positive class.
 #' @param ... Additional model parameters to be specified by the user.
 #' @return A data frame giving performance metrics for the specified sample size.
+#' @importFrom caret precision recall F_meas
+#' @importFrom stats rbinom predict rnorm lm
+#' @import dplyr
 #' @export
 acc_sim <- function(n,method = "Uniform",p=NULL,...){
   accuracy <- vector()
@@ -34,7 +37,7 @@ acc_sim <- function(n,method = "Uniform",p=NULL,...){
         samp <- dat[indices,]
         error <- rbinom(nrow(samp),1,eta)
       }
-      
+
       if(is.factor(samp[[outcome]])){
         samp$outobs <- factor(ifelse(error,!as.numeric(as.character(samp[[outcome]])),as.numeric(as.character(samp[[outcome]]))),levels=c("0","1"))
       } else{
@@ -56,7 +59,7 @@ acc_sim <- function(n,method = "Uniform",p=NULL,...){
                        error = function(e){return(NA)})
     fscore[j] <- tryCatch({F_meas(table(levels(pred)[pred],factor(dat[[outcome]],levels=c("0","1"))), relevant = 1)},
                           error = function(e){return(NA)})
-    
+
     if(power){
       reject <- vector()
       Dobs <- as.numeric(levels(pred)[pred])
@@ -69,9 +72,9 @@ acc_sim <- function(n,method = "Uniform",p=NULL,...){
                               error = function(e){return(NA)})
       }
       pwr[j] <- mean(reject,na.rm=T)
-      
+
     } else{pwr[j] <- NA}
-    
+
   }
   out <- tryCatch({data.frame(accuracy,prec,rec,fscore,n,pwr)},
                   error = function(e){return(NA)})
@@ -95,14 +98,18 @@ acc_sim <- function(n,method = "Uniform",p=NULL,...){
 #' @param effect_size If `power` is `TRUE`, a real number indicating the scaled effect size the user would like to be able to detect.
 #' @param powersims If `power` is `TRUE`, an integer indicating the number of simulations to be conducted at each step to calculate power.
 #' @param alpha If `power` is `TRUE`, a real number between 0 and 1 indicating the probability of Type I error to be used for hypothesis testing. Default is 0.05.
-#' @param parallel Boolean indicating whether or not to use parallel processing. 
+#' @param parallel Boolean indicating whether or not to use parallel processing.
 #' @param coreoffset If `parallel` is true, a positive integer indicating the number of free threads to be kept unused. Should not be larger than the number of CPU cores.
 #' @param packages A list of packages that need to be loaded in order to run `model`.
 #' @param method An optional string stating the distribution from which data is to be generated. Default is i.i.d. uniform sampling. Can also take a function outputting a vector of probabilities if the user wishes to specify a custom distribution.
 #' @param p If method is 'Class Imbalance', gives the degree of weight placed on the positive class.
 #' @param ... Additional arguments that need to be passed to `model`
-#' @return A `list` containing two named elements. `Raw` gives the exact output of the simulations, while `Summary` gives a table of accuracy metrics, including the achieved levels of $\epsilon$ and $\delta$ given the specified values. Alternative values can be calculated using [getpac()]
-#' @seealso [plot_accuracy()], to represent simulations visually, [getpac()], to calculate summaries for alternate values of $\epsilon$ and $\delta$ without conducting a new simulation, and [gendata()], to generated synthetic datasets.
+#' @return A `list` containing two named elements. `Raw` gives the exact output of the simulations, while `Summary` gives a table of accuracy metrics, including the achieved levels of \eqn{\epsilon} and \eqn{\delta} given the specified values. Alternative values can be calculated using [getpac()]
+#' @seealso [plot_accuracy()], to represent simulations visually, [getpac()], to calculate summaries for alternate values of \eqn{\epsilon} and \eqn{\delta} without conducting a new simulation, and [gendata()], to generated synthetic datasets.
+#' @import parallel
+#' @import dplyr
+#' @importFrom stats model.frame quantile
+#' @importFrom pbapply pblapply
 #' @examples
 #' mylogit <- function(formula, data){
 #' m <- structure(
@@ -113,15 +120,20 @@ acc_sim <- function(n,method = "Uniform",p=NULL,...){
 #' }
 #' mypred <- function(m,newdata){
 #' out <- predict.glm(m,newdata,type="response")
-#' out <- factor(ifelse(out>0.5,1,0),levels=c("0","1")) #Important - must specify levels to account for possibility of all observations being classified into the same class in smaller samples
+#' out <- factor(ifelse(out>0.5,1,0),levels=c("0","1"))
+#' #Important - must specify levels to account for possibility of all
+#' #observations being classified into the same class in smaller samples
 #' return(out)
 #' }
-#' br <- scR::br
-#' results <- estimate_accuracy(two_year_recid ~ race + sex + age + juv_fel_count + juv_misd_count + priors_count + charge_degree..misd.fel.,mylogit,br,predictfn = mypred)
+#' #not run
+#' #results <- estimate_accuracy(two_year_recid ~
+#' #race + sex + age + juv_fel_count + juv_misd_count + priors_count +
+#' #charge_degree..misd.fel.,mylogit,br,
+#' #predictfn = mypred)
 #' @export
 
 
-estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,upperlimit=NULL,nsample= 30, steps= 50,eta=0.05,delta=0.05,epsilon=0.05,predictfn = NULL,power = F,effect_size=NULL,powersims=NULL,alpha=0.05,parallel = T,coreoffset=0,packages=list(),method = c("Uniform","Class Imbalance"),p=NULL,...){
+estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,upperlimit=NULL,nsample= 30, steps= 50,eta=0.05,delta=0.05,epsilon=0.05,predictfn = NULL,power = FALSE,effect_size=NULL,powersims=NULL,alpha=0.05,parallel = TRUE,coreoffset=0,packages=list(),method = c("Uniform","Class Imbalance"),p=NULL,...){
   if(is.null(data)){
     names <- all.vars(formula)
     data <- gendata(model,dim,maxn,predictfn,names,...)
@@ -151,11 +163,11 @@ estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,upper
       predict.svrclass <- predictfn
     }
   })
-  results <-   suppressWarnings({pblapply(nvalues,acc_sim,method,p,cl=cl)})
+  results <- suppressWarnings({pblapply(nvalues,acc_sim,method,p, cl=cl)})
   stopCluster(cl)
   results <- bind_rows(results)
-  summtable <- results %>% group_by(n) %>% summarise(Accuracy = mean(accuracy,na.rm=T), 
-                                                     Precision = mean(prec,na.rm=T), 
+  summtable <- results %>% group_by(n) %>% summarise(Accuracy = mean(accuracy,na.rm=T),
+                                                     Precision = mean(prec,na.rm=T),
                                                      Recall = mean(rec,na.rm=T),
                                                      Fscore = mean(fscore,na.rm=T),
                                                      Delta = mean((1-accuracy) > epsilon,na.rm=T),
@@ -168,8 +180,10 @@ estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,upper
 #' @param table A list containing an element named `Raw`. Should always be used with the output of [estimate_accuracy()]
 #' @param delta A real number between 0 and 1 giving the targeted maximum probability of observing an OOS error rate higher than `epsilon`
 #' @param epsilon A real number between 0 and 1 giving the targeted maximum out-of-sample (OOS) error rate
-#' @return A `list` containing two named elements. `Raw` gives the exact output of the simulations, while `Summary` gives a table of accuracy metrics, including the achieved levels of $\epsilon$ and $\delta$ given the specified values. Alternative values can be calculated using [getpac()] again.
-#' @seealso [plot_accuracy()], to represent simulations visually, [getpac()], to calculate summaries for alternate values of $\epsilon$ and $\delta$ without conducting a new simulation, and [gendata()], to generated synthetic datasets.
+#' @return A `list` containing two named elements. `Raw` gives the exact output of the simulations, while `Summary` gives a table of accuracy metrics, including the achieved levels of \eqn{\epsilon} and \eqn{\delta} given the specified values. Alternative values can be calculated using [getpac()] again.
+#' @seealso [plot_accuracy()], to represent simulations visually, [getpac()], to calculate summaries for alternate values of \eqn{\epsilon} and \eqn{\delta} without conducting a new simulation, and [gendata()], to generated synthetic datasets.
+#' @import dplyr
+#' @importFrom stats quantile
 #' @examples
 #' mylogit <- function(formula, data){
 #' m <- structure(
@@ -180,18 +194,22 @@ estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,upper
 #' }
 #' mypred <- function(m,newdata){
 #' out <- predict.glm(m,newdata,type="response")
-#' out <- factor(ifelse(out>0.5,1,0),levels=c("0","1")) #Important - must specify levels to account for possibility of all observations being classified into the same class in smaller samples
+#' out <- factor(ifelse(out>0.5,1,0),levels=c("0","1"))
+#' #Important - must specify levels to account for possibility of all
+#' #observations being classified into the same class in smaller samples
 #' return(out)
 #' }
-#' br <- scR::br
-#' results <- estimate_accuracy(two_year_recid ~ race + sex + age + juv_fel_count + juv_misd_count + priors_count + charge_degree..misd.fel.,mylogit,br,predictfn = mypred)
-#' resultsalt <- getpac(results,epsilon=0.5,delta=0.3)
-#' print(resultsalt$Summary)
+#' # not run
+#' #results <- estimate_accuracy(two_year_recid ~ race +
+#'     #sex + age + juv_fel_count + juv_misd_count + priors_count +
+#'     #charge_degree..misd.fel.,mylogit,br,predictfn = mypred)
+#' #resultsalt <- getpac(results,epsilon=0.5,delta=0.3)
+#' #print(resultsalt$Summary)
 #' @export
 getpac <- function(table,epsilon=0.05,delta=0.05){
   results <- table$Raw
-  summtable <- results %>% group_by(n) %>% summarise(Accuracy = mean(accuracy,na.rm=T), 
-                                                     Precision = mean(prec,na.rm=T), 
+  summtable <- results %>% group_by(n) %>% summarise(Accuracy = mean(accuracy,na.rm=T),
+                                                     Precision = mean(prec,na.rm=T),
                                                      Recall = mean(rec,na.rm=T),
                                                      Fscore = mean(fscore,na.rm=T),
                                                      Delta = mean((1-accuracy) > (epsilon),na.rm=T),
@@ -204,8 +222,13 @@ getpac <- function(table,epsilon=0.05,delta=0.05){
 #' @param table A list containing an element named `Raw`. Should always be used with the output of [estimate_accuracy()]
 #' @param metrics A character vector containing the metrics to display in the plot. Can be any of "Accuracy", "Precision", "Recall", "Fscore", "delta", "epsilon"
 #' @param plottype A string giving the graphics package to be used to generate the plot. Can be one of "ggplot" or "plotly"
-#' @return Either a [ggplot2] or [plotly] plot object, depending on the chosen option of `plottype`.
+#' @return Either a \link[ggplot2]{ggplot} or \link[plotly]{plot_ly} plot object, depending on the chosen option of `plottype`.
 #' @seealso [estimate_accuracy()], to generate estimated sample complexity bounds.
+#' @importFrom tidyr pivot_longer
+#' @import dplyr
+#' @importFrom ggplot2 ggplot aes geom_line
+#' @importFrom plotly plot_ly layout
+#' @importFrom rlang .data
 #' @examples
 #' mylogit <- function(formula, data){
 #' m <- structure(
@@ -216,17 +239,21 @@ getpac <- function(table,epsilon=0.05,delta=0.05){
 #' }
 #' mypred <- function(m,newdata){
 #' out <- predict.glm(m,newdata,type="response")
-#' out <- factor(ifelse(out>0.5,1,0),levels=c("0","1")) #Important - must specify levels to account for possibility of all observations being classified into the same class in smaller samples
+#' out <- factor(ifelse(out>0.5,1,0),levels=c("0","1"))
+#' #Important - must specify levels to account for possibility of all
+#' #observations being classified into the same class in smaller samples
 #' return(out)
 #' }
-#' br <- scR::br
-#' results <- estimate_accuracy(two_year_recid ~ race + sex + age + juv_fel_count + juv_misd_count + priors_count + charge_degree..misd.fel.,mylogit,br,predictfn = mypred)
-#' fig <- plot_accuracy(results)
-#' fig
+#' #not run
+#' #results <- estimate_accuracy(two_year_recid ~ race + sex + age +
+#'       #juv_fel_count + juv_misd_count + priors_count +
+#'       #charge_degree..misd.fel.,mylogit,br,predictfn = mypred)
+#' #fig <- plot_accuracy(results)
+#' #fig
 #' @export
 plot_accuracy <- function(table,metrics=c("Accuracy","Precision","Recall","Fscore","Delta","Epsilon","Power"),plottype = c("ggplot","plotly")){
-  
-  toplot <- table$Summary %>% 
+
+  toplot <- table$Summary %>%
    select(n,all_of(metrics)) %>%
       pivot_longer(cols=Accuracy:Power,names_to = "Metric",values_to = "Value")
   if("Delta" %in% metrics){
@@ -237,8 +264,8 @@ plot_accuracy <- function(table,metrics=c("Accuracy","Precision","Recall","Fscor
   }
   plottype <- plottype[1]
   if(plottype=="ggplot"){
-    plot<- toplot %>% 
-      ggplot(.,aes(x=n,y=Value,col=Metric,linetype=Metric)) + geom_line() 
+    plot<- toplot %>%
+      ggplot(.data,aes(x=n,y=Value,col=Metric,linetype=Metric)) + geom_line()
   } else if(plottype=="plotly"){
     plot <- plot_ly(toplot, x= ~n, y = ~Value, color = ~Metric, mode = 'lines') %>%
       layout(yaxis = list(title= ""), legend = list(orientation = ''))  #TODO - add ability to change plotly options
@@ -246,7 +273,7 @@ plot_accuracy <- function(table,metrics=c("Accuracy","Precision","Recall","Fscor
     simpleError("Invalid Plot Type")
   }
   return(plot)
-    
+
 }
 
 

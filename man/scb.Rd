@@ -35,12 +35,16 @@ return(m)
 }
 mypred <- function(m,newdata){
 out <- predict.glm(m,newdata,type="response")
-out <- factor(ifelse(out>0.5,1,0),levels=c("0","1")) #Important - must specify levels to account for possibility of all observations being classified into the same class in smaller samples
+out <- factor(ifelse(out>0.5,1,0),levels=c("0","1"))
+#Important - must specify levels to account for possibility of all
+#observations being classified into the same class in smaller samples
 return(out)
 }
-scb(epsilon=0.05,delta=0.05,eta=0.05,theor=F,model=mylogit,dim=7,m=100,k=100,maxn=500,predictfn = mypred)
-vcd <- 7
-scb(vcd,epsilon=0.05,delta=0.05,eta=0.05)
+#not run
+#scb(epsilon=0.05,delta=0.05,eta=0.05,theor=FALSE,
+#model=mylogit,dim=7,m=100,k=100,maxn=500,predictfn = mypred)
+#vcd <- 7
+#scb(vcd,epsilon=0.05,delta=0.05,eta=0.05)
 }
 \seealso{
 \code{\link[=simvcd]{simvcd()}}, to calculate VCD for a chosen model

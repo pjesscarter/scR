@@ -31,6 +31,8 @@ simvcd(
 
 \item{k}{A positive integer giving the number of design points (sample size values) for which the bounding function is to be estimated. Higher values give more accurate results but increase computation time.}
 
+\item{maxn}{Gives the vertical dimension of the data (number of observations) to be generated.}
+
 \item{parallel}{Boolean indicating whether or not to use parallel processing.}
 
 \item{coreoffset}{If \code{parallel} is true, a positive integer indicating the number of free threads to be kept unused. Should not be larger than the number of CPU cores.}
@@ -61,10 +63,14 @@ return(m)
 }
 mypred <- function(m,newdata){
 out <- predict.glm(m,newdata,type="response")
-out <- factor(ifelse(out>0.5,1,0),levels=c("0","1")) #Important - must specify levels to account for possibility of all observations being classified into the same class in smaller samples
+out <- factor(ifelse(out>0.5,1,0),levels=c("0","1"))
+#Important - must specify levels to account for possibility of all
+#observations being classified into the same class in smaller samples
 return(out)
 }
-vcd <- simvcd(model=mylogit,dim=7,m=100,k=100,maxn=500,predictfn = mypred) #Takes about 20 minutes to run on mid-range test machine (Intel i5-11600K CPU)
+#not run
+#vcd <- simvcd(model=mylogit,dim=7,m=100,k=100,maxn=500,predictfn = mypred)
+#Takes about 20 minutes to run on mid-range test machine (Intel i5-11600K CPU)
 }
 \seealso{
 \code{\link[=scb]{scb()}}, to calculate sample complexity bounds given estimated VCD.

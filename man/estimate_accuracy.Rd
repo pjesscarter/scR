@@ -10,12 +10,22 @@ estimate_accuracy(
   data = NULL,
   dim = NULL,
   maxn = NULL,
+  upperlimit = NULL,
   nsample = 30,
   steps = 50,
   eta = 0.05,
   delta = 0.05,
   epsilon = 0.05,
   predictfn = NULL,
+  power = FALSE,
+  effect_size = NULL,
+  powersims = NULL,
+  alpha = 0.05,
+  parallel = TRUE,
+  coreoffset = 0,
+  packages = list(),
+  method = c("Uniform", "Class Imbalance"),
+  p = NULL,
   ...
 )
 }
@@ -30,6 +40,8 @@ estimate_accuracy(
 
 \item{maxn}{Required if \code{data} is unspecified. Gives the vertical dimension of the data (number of observations) to be generated.}
 
+\item{upperlimit}{Optional. A positive integer giving the maximum sample size to be simulated, if data was supplied.}
+
 \item{nsample}{A positive integer giving the number of samples to be generated for each value of $n$. Larger values give more accurate results.}
 
 \item{steps}{A positive integer giving the number of values of $n$ for which simulations should be conducted. Larger values give more accurate results.}
@@ -42,10 +54,28 @@ estimate_accuracy(
 
 \item{predictfn}{An optional user-defined function giving a custom predict method. If also using a user-defined model, the \code{model} should output an object of class \code{"svrclass"} to avoid errors.}
 
+\item{power}{A logical indicating whether experimental power based on the predictions should also be reported}
+
+\item{effect_size}{If \code{power} is \code{TRUE}, a real number indicating the scaled effect size the user would like to be able to detect.}
+
+\item{powersims}{If \code{power} is \code{TRUE}, an integer indicating the number of simulations to be conducted at each step to calculate power.}
+
+\item{alpha}{If \code{power} is \code{TRUE}, a real number between 0 and 1 indicating the probability of Type I error to be used for hypothesis testing. Default is 0.05.}
+
+\item{parallel}{Boolean indicating whether or not to use parallel processing.}
+
+\item{coreoffset}{If \code{parallel} is true, a positive integer indicating the number of free threads to be kept unused. Should not be larger than the number of CPU cores.}
+
+\item{packages}{A list of packages that need to be loaded in order to run \code{model}.}
+
+\item{method}{An optional string stating the distribution from which data is to be generated. Default is i.i.d. uniform sampling. Can also take a function outputting a vector of probabilities if the user wishes to specify a custom distribution.}
+
+\item{p}{If method is 'Class Imbalance', gives the degree of weight placed on the positive class.}
+
 \item{...}{Additional arguments that need to be passed to \code{model}}
 }
 \value{
-A \code{list} containing two named elements. \code{Raw} gives the exact output of the simulations, while \code{Summary} gives a table of accuracy metrics, including the achieved levels of $\epsilon$ and $\delta$ given the specified values. Alternative values can be calculated using \code{\link[=getpac]{getpac()}}
+A \code{list} containing two named elements. \code{Raw} gives the exact output of the simulations, while \code{Summary} gives a table of accuracy metrics, including the achieved levels of \eqn{\epsilon} and \eqn{\delta} given the specified values. Alternative values can be calculated using \code{\link[=getpac]{getpac()}}
 }
 \description{
 Estimate sample complexity bounds for a binary classification algorithm using either simulated or user-supplied data.
@@ -60,12 +90,17 @@ return(m)
 }
 mypred <- function(m,newdata){
 out <- predict.glm(m,newdata,type="response")
-out <- factor(ifelse(out>0.5,1,0),levels=c("0","1")) #Important - must specify levels to account for possibility of all observations being classified into the same class in smaller samples
+out <- factor(ifelse(out>0.5,1,0),levels=c("0","1"))
+#Important - must specify levels to account for possibility of all
+#observations being classified into the same class in smaller samples
 return(out)
 }
-br <- scR::br
-results <- estimate_accuracy(two_year_recid ~ race + sex + age + juv_fel_count + juv_misd_count + priors_count + charge_degree..misd.fel.,mylogit,br,predictfn = mypred)
+#not run
+#results <- estimate_accuracy(two_year_recid ~
+#race + sex + age + juv_fel_count + juv_misd_count + priors_count +
+#charge_degree..misd.fel.,mylogit,br,
+#predictfn = mypred)
 }
 \seealso{
-\code{\link[=plot_accuracy]{plot_accuracy()}}, to represent simulations visually, \code{\link[=getpac]{getpac()}}, to calculate summaries for alternate values of $\epsilon$ and $\delta$ without conducting a new simulation, and \code{\link[=gendata]{gendata()}}, to generated synthetic datasets.
+\code{\link[=plot_accuracy]{plot_accuracy()}}, to represent simulations visually, \code{\link[=getpac]{getpac()}}, to calculate summaries for alternate values of \eqn{\epsilon} and \eqn{\delta} without conducting a new simulation, and \code{\link[=gendata]{gendata()}}, to generated synthetic datasets.
 }

@@ -1,0 +1,1 @@
+utils::globalVariables(c("accuracy","prec","rec","fscore","pwr","nsample","dat","eta","outcome","model","power","powersims","effect_size", "alpha","Accuracy","Power","Value","Metric","m","l","model"))

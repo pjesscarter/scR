@@ -35,12 +35,17 @@ return(m)
 }
 mypred <- function(m,newdata){
 out <- predict.glm(m,newdata,type="response")
-out <- factor(ifelse(out>0.5,1,0),levels=c("0","1")) #Important - must specify levels to account for possibility of all observations being classified into the same class in smaller samples
+out <- factor(ifelse(out>0.5,1,0),levels=c("0","1"))
+#Important - must specify levels to account for possibility of all
+#observations being classified into the same class in smaller samples
 return(out)
 }
-formula <- two_year_recid ~ race + sex + age + juv_fel_count + juv_misd_count + priors_count + charge_degree..misd.fel.,mylogit
-br <- gendata(mylogit,7,7214,mypred,all.vars(formula))
-results <- estimate_accuracy(formula,br,predictfn = mypred)
+formula <- two_year_recid ~
+  race + sex + age + juv_fel_count +
+  juv_misd_count + priors_count + charge_degree..misd.fel.
+dat <- gendata(mylogit,7,7214,mypred,all.vars(formula))
+#not run
+#results <- estimate_accuracy(formula,dat,predictfn = mypred)
 }
 \seealso{
 \code{\link[=estimate_accuracy]{estimate_accuracy()}}, to estimate sample complexity bounds given the generated data

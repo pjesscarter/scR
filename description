@@ -2,26 +2,29 @@ Package: scR
 Title: Estimate VCD Dimension and Required Sample Size Necessary for Applied Machine Learning Research
 Version: 0.1.0
 Authors@R:
-    c(person("Perry", "Carter", , "pjcarter@princeton.edu", role = c("aut", "cre"),
+    c(person("Perry", "Carter", , "pjc504@nyu.edu", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-4684-6533")),
 	person("Dahyun", "Choi", , "dahyunc@princeton.edu", role = c("aut"),
 		comment = c(ORCID = "0000-0002-2628-1467")))
-Description: The scR package provides
-License: `use_mit_license()`
+Description: The scR package provides a suite of tools for estimating the sample complexity of a chosen model through theoretical bounds and simulation.
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.2.3
+RoxygenNote: 7.3.2
 URL: https://github.com/pjesscarter/scR
 BugReports: https://github.com/pjesscarter/scR/issues
 Imports:
     parallel,
+	rlang,
     pbapply,
-    caret,
+	caret,
     dplyr,
     tidyr,
     ggplot2,
     plotly
 Suggests:
-    knitr,
     rmarkdown
-VignetteBuilder: knitr
+Depends: 
+    R (>= 2.10)
+LazyData: true
+LazyDataCompression: xz
+License: MIT + file LICENSE

@@ -17,20 +17,3 @@ A real number giving the estimated value of Xi(n), the bounding function
 \description{
 Utility function to generate data points for estimation of the VC Dimension of a user-specified binary classification algorithm given a specified sample size.
 }
-\examples{
-mylogit <- function(formula, data){
-m <- structure(
-  glm(formula=formula,data=data,family=binomial(link="logit")),
-  class=c("svrclass","glm")  #IMPORTANT - must use the class svrclass to work correctly
-)
-return(m)
-}
-mypred <- function(m,newdata){
-out <- predict.glm(m,newdata,type="response")
-out <- factor(ifelse(out>0.5,1,0),levels=c("0","1")) #Important - must specify levels to account for possibility of all observations being classified into the same class in smaller samples
-return(out)
-}
-predict.svrclass <- mypred
-model <- mylogit
-risk_bounds(5)
-}

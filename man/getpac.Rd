@@ -14,7 +14,7 @@ getpac(table, epsilon = 0.05, delta = 0.05)
 \item{delta}{A real number between 0 and 1 giving the targeted maximum probability of observing an OOS error rate higher than \code{epsilon}}
 }
 \value{
-A \code{list} containing two named elements. \code{Raw} gives the exact output of the simulations, while \code{Summary} gives a table of accuracy metrics, including the achieved levels of $\epsilon$ and $\delta$ given the specified values. Alternative values can be calculated using \code{\link[=getpac]{getpac()}} again.
+A \code{list} containing two named elements. \code{Raw} gives the exact output of the simulations, while \code{Summary} gives a table of accuracy metrics, including the achieved levels of \eqn{\epsilon} and \eqn{\delta} given the specified values. Alternative values can be calculated using \code{\link[=getpac]{getpac()}} again.
 }
 \description{
 Recalculate achieved sample complexity bounds given different parameter inputs
@@ -29,14 +29,18 @@ return(m)
 }
 mypred <- function(m,newdata){
 out <- predict.glm(m,newdata,type="response")
-out <- factor(ifelse(out>0.5,1,0),levels=c("0","1")) #Important - must specify levels to account for possibility of all observations being classified into the same class in smaller samples
+out <- factor(ifelse(out>0.5,1,0),levels=c("0","1"))
+#Important - must specify levels to account for possibility of all
+#observations being classified into the same class in smaller samples
 return(out)
 }
-br <- scR::br
-results <- estimate_accuracy(two_year_recid ~ race + sex + age + juv_fel_count + juv_misd_count + priors_count + charge_degree..misd.fel.,mylogit,br,predictfn = mypred)
-resultsalt <- getpac(results,epsilon=0.5,delta=0.3)
-print(resultsalt$Summary)
+# not run
+#results <- estimate_accuracy(two_year_recid ~ race +
+    #sex + age + juv_fel_count + juv_misd_count + priors_count +
+    #charge_degree..misd.fel.,mylogit,br,predictfn = mypred)
+#resultsalt <- getpac(results,epsilon=0.5,delta=0.3)
+#print(resultsalt$Summary)
 }
 \seealso{
-\code{\link[=plot_accuracy]{plot_accuracy()}}, to represent simulations visually, \code{\link[=getpac]{getpac()}}, to calculate summaries for alternate values of $\epsilon$ and $\delta$ without conducting a new simulation, and \code{\link[=gendata]{gendata()}}, to generated synthetic datasets.
+\code{\link[=plot_accuracy]{plot_accuracy()}}, to represent simulations visually, \code{\link[=getpac]{getpac()}}, to calculate summaries for alternate values of \eqn{\epsilon} and \eqn{\delta} without conducting a new simulation, and \code{\link[=gendata]{gendata()}}, to generated synthetic datasets.
 }

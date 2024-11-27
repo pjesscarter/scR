@@ -4,23 +4,9 @@
 #'
 #' @param x An integer giving the desired sample size for which the target function is to be approximated.
 #' @param ... Additional model parameters to be specified by the user.
+#' @importFrom stats rnorm predict
 #' @return A real number giving the estimated value of Xi(n), the bounding function
-#' @examples
-#' mylogit <- function(formula, data){
-#' m <- structure(
-#'   glm(formula=formula,data=data,family=binomial(link="logit")),
-#'   class=c("svrclass","glm")  #IMPORTANT - must use the class svrclass to work correctly
-#' )
-#' return(m)
-#' }
-#' mypred <- function(m,newdata){
-#' out <- predict.glm(m,newdata,type="response")
-#' out <- factor(ifelse(out>0.5,1,0),levels=c("0","1")) #Important - must specify levels to account for possibility of all observations being classified into the same class in smaller samples
-#' return(out)
-#' }
-#' predict.svrclass <- mypred
-#' model <- mylogit
-#' risk_bounds(5)
+
 
 risk_bounds <- function(x,...){
   n <- x
@@ -50,7 +36,7 @@ risk_bounds <- function(x,...){
                          skip <<- T}
       )
     }
-    
+
     #Different models also use different predict methods
     RW <- mean(predict(fhat,W[,-(l+1)]) != factor(W$y,levels=c("0","1")))
     RWprime <- mean(predict(fhat,Wprime[,-(l+1)]) != factor(Wprime$y,levels=c("0","1")))
@@ -72,7 +58,7 @@ risk_bounds <- function(x,...){
 #' @seealso [simvcd()], the user-facing function for simulating VC dimension and [risk_bounds()] to generate estimates for xi.
 loss <- function(h,ngrid,xi,a=0.16,a1=1.2,a11=0.14927){
   #These constants are calculated in Vapnik, Levin and Le Cun 1994
-  #based on the known VC dimension of linear discriminant functions 
+  #based on the known VC dimension of linear discriminant functions
   #and rely on the assumption that they are universal for all classifiers
   ratio <- ngrid/h
   phi <- a*((log((2*ratio))+1)/(ratio-a11))*(1+sqrt((1+((a1*(ratio - a11))/(1+log(2*ratio))))))
@@ -88,10 +74,11 @@ loss <- function(h,ngrid,xi,a=0.16,a1=1.2,a11=0.14927){
 #'
 #' @param model A binary classification model supplied by the user. Must take arguments `formula` and `data`
 #' @param dim A positive integer giving dimension (number of input features) of the model.
+#' @param maxn Gives the vertical dimension of the data (number of observations) to be generated.
 #' @param packages A `list` of strings giving the names of packages to be loaded in order to estimate the model.
 #' @param m A positive integer giving the number of simulations to be performed at each design point (sample size value). Higher values give more accurate results but increase computation time.
 #' @param k A positive integer giving the number of design points (sample size values) for which the bounding function is to be estimated. Higher values give more accurate results but increase computation time.
-#' @param parallel Boolean indicating whether or not to use parallel processing. 
+#' @param parallel Boolean indicating whether or not to use parallel processing.
 #' @param coreoffset If `parallel` is true, a positive integer indicating the number of free threads to be kept unused. Should not be larger than the number of CPU cores.
 #' @param predictfn An optional user-defined function giving a custom predict method. If also using a user-defined model, the `model` should output an object of class `"svrclass"` to avoid errors.
 #' @param a Scaling coefficient for the bounding function. Defaults to the value given by Vapnik, Levin and Le Cun 1994.
@@ -100,6 +87,10 @@ loss <- function(h,ngrid,xi,a=0.16,a1=1.2,a11=0.14927){
 #' @param ... Additional arguments that need to be passed to `model`
 #' @return A real number giving the estimated value of the VC dimension of the supplied model.
 #' @seealso [scb()], to calculate sample complexity bounds given estimated VCD.
+#' @import parallel
+#' @import dplyr
+#' @importFrom pbapply pbsapply
+#' @importFrom stats optim
 #' @examples
 #' mylogit <- function(formula, data){
 #' m <- structure(
@@ -110,10 +101,14 @@ loss <- function(h,ngrid,xi,a=0.16,a1=1.2,a11=0.14927){
 #' }
 #' mypred <- function(m,newdata){
 #' out <- predict.glm(m,newdata,type="response")
-#' out <- factor(ifelse(out>0.5,1,0),levels=c("0","1")) #Important - must specify levels to account for possibility of all observations being classified into the same class in smaller samples
+#' out <- factor(ifelse(out>0.5,1,0),levels=c("0","1"))
+#' #Important - must specify levels to account for possibility of all
+#' #observations being classified into the same class in smaller samples
 #' return(out)
 #' }
-#' vcd <- simvcd(model=mylogit,dim=7,m=100,k=100,maxn=500,predictfn = mypred) #Takes about 20 minutes to run on mid-range test machine (Intel i5-11600K CPU)
+#' #not run
+#' #vcd <- simvcd(model=mylogit,dim=7,m=100,k=100,maxn=500,predictfn = mypred)
+#' #Takes about 20 minutes to run on mid-range test machine (Intel i5-11600K CPU)
 #' @export
 simvcd <- function(model,dim,packages=list(),m=1000,k=1000,maxn=5000,parallel = T,coreoffset=0, predictfn = NULL, a=0.16,a1=1.2,a11=0.14927, ...){
   ngrid <- seq(dim,maxn,(maxn/k))
@@ -136,8 +131,8 @@ simvcd <- function(model,dim,packages=list(),m=1000,k=1000,maxn=5000,parallel = 
   })
   #Need to work on passing function arguments with pbapply - some issues around parallelization
   xihats <- suppressWarnings({pbsapply(ngrid,risk_bounds,...,cl=cl)})
-  res2stopCluster(cl)
-  vcd <- optim((l+1),loss,ngrid=ngrid,xi=xihats, , a=a,a1=a1,a11=a11, method="Brent",lower=1,upper = 2*(max(ngrid)), ...)
+  stopCluster(cl)
+  vcd <- optim((l+1),loss,ngrid=ngrid,xi=xihats, a=a,a1=a1,a11=a11, method="Brent",lower=1,upper = 2*(max(ngrid)), ...)
   return(vcd$par)
 }
 
@@ -161,12 +156,16 @@ simvcd <- function(model,dim,packages=list(),m=1000,k=1000,maxn=5000,parallel = 
 #' }
 #' mypred <- function(m,newdata){
 #' out <- predict.glm(m,newdata,type="response")
-#' out <- factor(ifelse(out>0.5,1,0),levels=c("0","1")) #Important - must specify levels to account for possibility of all observations being classified into the same class in smaller samples
+#' out <- factor(ifelse(out>0.5,1,0),levels=c("0","1"))
+#' #Important - must specify levels to account for possibility of all
+#' #observations being classified into the same class in smaller samples
 #' return(out)
 #' }
-#' scb(epsilon=0.05,delta=0.05,eta=0.05,theor=F,model=mylogit,dim=7,m=100,k=100,maxn=500,predictfn = mypred)
-#' vcd <- 7
-#' scb(vcd,epsilon=0.05,delta=0.05,eta=0.05)
+#' #not run
+#' #scb(epsilon=0.05,delta=0.05,eta=0.05,theor=FALSE,
+#' #model=mylogit,dim=7,m=100,k=100,maxn=500,predictfn = mypred)
+#' #vcd <- 7
+#' #scb(vcd,epsilon=0.05,delta=0.05,eta=0.05)
 #' @export
 scb <- function(vcd=NULL,epsilon=NULL,delta=NULL,eta=NULL,theor=TRUE,...){
   if(!theor){
