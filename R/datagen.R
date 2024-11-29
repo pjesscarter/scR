@@ -28,8 +28,13 @@
 #'   race + sex + age + juv_fel_count +
 #'   juv_misd_count + priors_count + charge_degree..misd.fel.
 #' dat <- gendata(mylogit,7,7214,mypred,all.vars(formula))
-#' #not run
-#' #results <- estimate_accuracy(formula,dat,predictfn = mypred)
+#' \donttest{
+#' library(parallel)
+#' results <- estimate_accuracy(formula,mylogit,dat,predictfn = mypred,
+#'     nsample=10,
+#'     steps=10,
+#'     coreoffset = (detectCores() -2))
+#' }
 #' @export
 
 gendata <- function(model,dim,maxn,predictfn=NULL,varnames=NULL, ...){

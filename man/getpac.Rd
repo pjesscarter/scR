@@ -34,12 +34,17 @@ out <- factor(ifelse(out>0.5,1,0),levels=c("0","1"))
 #observations being classified into the same class in smaller samples
 return(out)
 }
-# not run
-#results <- estimate_accuracy(two_year_recid ~ race +
-    #sex + age + juv_fel_count + juv_misd_count + priors_count +
-    #charge_degree..misd.fel.,mylogit,br,predictfn = mypred)
-#resultsalt <- getpac(results,epsilon=0.5,delta=0.3)
-#print(resultsalt$Summary)
+\donttest{
+library(parallel)
+results <- estimate_accuracy(two_year_recid ~ race +
+    sex + age + juv_fel_count + juv_misd_count + priors_count +
+    charge_degree..misd.fel.,mylogit,br,predictfn = mypred,
+    nsample=10,
+    steps=10,
+    coreoffset = (detectCores() -2))
+resultsalt <- getpac(results,epsilon=0.5,delta=0.3)
+print(resultsalt$Summary)
+}
 }
 \seealso{
 \code{\link[=plot_accuracy]{plot_accuracy()}}, to represent simulations visually, \code{\link[=getpac]{getpac()}}, to calculate summaries for alternate values of \eqn{\epsilon} and \eqn{\delta} without conducting a new simulation, and \code{\link[=gendata]{gendata()}}, to generated synthetic datasets.

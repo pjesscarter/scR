@@ -106,14 +106,22 @@ loss <- function(h,ngrid,xi,a=0.16,a1=1.2,a11=0.14927){
 #' #observations being classified into the same class in smaller samples
 #' return(out)
 #' }
-#' #not run
-#' #vcd <- simvcd(model=mylogit,dim=7,m=100,k=100,maxn=500,predictfn = mypred)
-#' #Takes about 20 minutes to run on mid-range test machine (Intel i5-11600K CPU)
+#' library(parallel)
+#' vcd <- simvcd(model=mylogit,dim=7,m=10,k=10,maxn=50,predictfn = mypred,
+#'     coreoffset = (detectCores() -2))
 #' @export
-simvcd <- function(model,dim,packages=list(),m=1000,k=1000,maxn=5000,parallel = T,coreoffset=0, predictfn = NULL, a=0.16,a1=1.2,a11=0.14927, ...){
+simvcd <- function(model,dim,packages=list(),m=1000,k=1000,maxn=5000,parallel = TRUE,coreoffset=0, predictfn = NULL, a=0.16,a1=1.2,a11=0.14927, ...){
   ngrid <- seq(dim,maxn,(maxn/k))
   if(parallel){
-    cl <- detectCores() -coreoffset
+    chk <- Sys.getenv("_R_CHECK_LIMIT_CORES_", "")
+
+    if (nzchar(chk) && chk == "TRUE") {
+      # use 2 cores in CRAN/Travis/AppVeyor
+      cl <- 2L
+    } else {
+      # use all cores in devtools::test()
+      cl <- detectCores() -coreoffset
+    }
     cl <- makeCluster(cl)
   } else{
     cl <- 1
@@ -161,11 +169,12 @@ simvcd <- function(model,dim,packages=list(),m=1000,k=1000,maxn=5000,parallel = 
 #' #observations being classified into the same class in smaller samples
 #' return(out)
 #' }
-#' #not run
-#' #scb(epsilon=0.05,delta=0.05,eta=0.05,theor=FALSE,
-#' #model=mylogit,dim=7,m=100,k=100,maxn=500,predictfn = mypred)
-#' #vcd <- 7
-#' #scb(vcd,epsilon=0.05,delta=0.05,eta=0.05)
+#' library(parallel)
+#' scb(epsilon=0.05,delta=0.05,eta=0.05,theor=FALSE,
+#' model=mylogit,dim=7,m=10,k=10,maxn=50,predictfn = mypred,
+#'     coreoffset = (detectCores() -2))
+#' vcd <- 7
+#' scb(vcd,epsilon=0.05,delta=0.05,eta=0.05)
 #' @export
 scb <- function(vcd=NULL,epsilon=NULL,delta=NULL,eta=NULL,theor=TRUE,...){
   if(!theor){

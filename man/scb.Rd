@@ -40,11 +40,12 @@ out <- factor(ifelse(out>0.5,1,0),levels=c("0","1"))
 #observations being classified into the same class in smaller samples
 return(out)
 }
-#not run
-#scb(epsilon=0.05,delta=0.05,eta=0.05,theor=FALSE,
-#model=mylogit,dim=7,m=100,k=100,maxn=500,predictfn = mypred)
-#vcd <- 7
-#scb(vcd,epsilon=0.05,delta=0.05,eta=0.05)
+library(parallel)
+scb(epsilon=0.05,delta=0.05,eta=0.05,theor=FALSE,
+model=mylogit,dim=7,m=10,k=10,maxn=50,predictfn = mypred,
+    coreoffset = (detectCores() -2))
+vcd <- 7
+scb(vcd,epsilon=0.05,delta=0.05,eta=0.05)
 }
 \seealso{
 \code{\link[=simvcd]{simvcd()}}, to calculate VCD for a chosen model

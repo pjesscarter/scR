@@ -7,7 +7,8 @@
 plot_accuracy(
   table,
   metrics = c("Accuracy", "Precision", "Recall", "Fscore", "Delta", "Epsilon", "Power"),
-  plottype = c("ggplot", "plotly")
+  plottype = c("ggplot", "plotly"),
+  letters = c("greek", "latin")
 )
 }
 \arguments{
@@ -16,6 +17,8 @@ plot_accuracy(
 \item{metrics}{A character vector containing the metrics to display in the plot. Can be any of "Accuracy", "Precision", "Recall", "Fscore", "delta", "epsilon"}
 
 \item{plottype}{A string giving the graphics package to be used to generate the plot. Can be one of "ggplot" or "plotly"}
+
+\item{letters}{A string determining whether delta and epsilon should be given as greek letters in the plot legend. Defaults to Greek lettering but available in case of rendering issues.}
 }
 \value{
 Either a \link[ggplot2]{ggplot} or \link[plotly]{plot_ly} plot object, depending on the chosen option of \code{plottype}.
@@ -38,12 +41,18 @@ out <- factor(ifelse(out>0.5,1,0),levels=c("0","1"))
 #observations being classified into the same class in smaller samples
 return(out)
 }
-#not run
-#results <- estimate_accuracy(two_year_recid ~ race + sex + age +
-      #juv_fel_count + juv_misd_count + priors_count +
-      #charge_degree..misd.fel.,mylogit,br,predictfn = mypred)
-#fig <- plot_accuracy(results)
-#fig
+\donttest{
+library(parallel)
+results <- estimate_accuracy(two_year_recid ~ race + sex + age +
+      juv_fel_count + juv_misd_count + priors_count +
+      charge_degree..misd.fel.,mylogit,br,predictfn = mypred,
+    nsample=10,
+    steps=10,
+    coreoffset = (detectCores() -2))
+
+fig <- plot_accuracy(results,letters="latin")
+fig
+}
 }
 \seealso{
 \code{\link[=estimate_accuracy]{estimate_accuracy()}}, to generate estimated sample complexity bounds.

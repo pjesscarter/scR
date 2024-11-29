@@ -11,7 +11,7 @@ simvcd(
   m = 1000,
   k = 1000,
   maxn = 5000,
-  parallel = T,
+  parallel = TRUE,
   coreoffset = 0,
   predictfn = NULL,
   a = 0.16,
@@ -68,9 +68,9 @@ out <- factor(ifelse(out>0.5,1,0),levels=c("0","1"))
 #observations being classified into the same class in smaller samples
 return(out)
 }
-#not run
-#vcd <- simvcd(model=mylogit,dim=7,m=100,k=100,maxn=500,predictfn = mypred)
-#Takes about 20 minutes to run on mid-range test machine (Intel i5-11600K CPU)
+library(parallel)
+vcd <- simvcd(model=mylogit,dim=7,m=10,k=10,maxn=50,predictfn = mypred,
+    coreoffset = (detectCores() -2))
 }
 \seealso{
 \code{\link[=scb]{scb()}}, to calculate sample complexity bounds given estimated VCD.

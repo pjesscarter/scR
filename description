@@ -1,12 +1,12 @@
 Package: scR
-Title: Estimate VCD Dimension and Required Sample Size Necessary for Applied Machine Learning Research
+Title: Estimate Vapnik-Chervonenkis Dimension and Sample Complexity 
 Version: 0.1.0
 Authors@R:
     c(person("Perry", "Carter", , "pjc504@nyu.edu", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-4684-6533")),
 	person("Dahyun", "Choi", , "dahyunc@princeton.edu", role = c("aut"),
 		comment = c(ORCID = "0000-0002-2628-1467")))
-Description: The scR package provides a suite of tools for estimating the sample complexity of a chosen model through theoretical bounds and simulation.
+Description: We provide a suite of tools for estimating the sample complexity of a chosen model through theoretical bounds and simulation. The package incorporates methods for estimating the Vapnik-Chervonenkis dimension (VCD) of a chosen algorithm, which can be used to estimate its sample complexity. Alternatively, we provide simulation methods to estimate sample complexity directly. For more details, see Carter, P & Choi, D (2024). "Learning from Noise: Applying Sample Complexity for Political Science Research" <doi:10.31219/osf.io/evrcj>.
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
@@ -14,7 +14,6 @@ URL: https://github.com/pjesscarter/scR
 BugReports: https://github.com/pjesscarter/scR/issues
 Imports:
     parallel,
-	rlang,
     pbapply,
 	caret,
     dplyr,

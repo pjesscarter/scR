@@ -125,11 +125,17 @@ acc_sim <- function(n,method = "Uniform",p=NULL,...){
 #' #observations being classified into the same class in smaller samples
 #' return(out)
 #' }
-#' #not run
-#' #results <- estimate_accuracy(two_year_recid ~
-#' #race + sex + age + juv_fel_count + juv_misd_count + priors_count +
-#' #charge_degree..misd.fel.,mylogit,br,
-#' #predictfn = mypred)
+#' \donttest{
+#' library(parallel)
+#'   results <- estimate_accuracy(two_year_recid ~
+#'     race + sex + age + juv_fel_count + juv_misd_count + priors_count +
+#'     charge_degree..misd.fel.,mylogit,br,
+#'     predictfn = mypred,
+#'     nsample=10,
+#'     steps=10,
+#'     coreoffset = (detectCores() -2)
+#'   )
+#' }
 #' @export
 
 
@@ -138,6 +144,7 @@ estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,upper
     names <- all.vars(formula)
     data <- gendata(model,dim,maxn,predictfn,names,...)
   }
+  method <- match.arg(method)
   results <- list()
   outcome <- all.vars(formula)[1]
   dat <- model.frame(formula,data)
@@ -148,7 +155,15 @@ estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,upper
   # }
   ####function printing out the minimum sample size that achieves the highest accuracy
   if(parallel){
-    cl <- detectCores() -coreoffset
+    chk <- Sys.getenv("_R_CHECK_LIMIT_CORES_", "")
+
+    if (nzchar(chk) && chk == "TRUE") {
+      # use 2 cores in CRAN/Travis/AppVeyor
+      cl <- 2L
+    } else {
+      # use all cores in devtools::test()
+      cl <- detectCores() -coreoffset
+    }
     cl <- makeCluster(cl)
   } else{
     cl <- 1
@@ -163,7 +178,7 @@ estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,upper
       predict.svrclass <- predictfn
     }
   })
-  results <- suppressWarnings({pblapply(nvalues,acc_sim,method,p, cl=cl)})
+  results <- suppressWarnings({pblapply(nvalues,acc_sim,method,p,cl=cl)})
   stopCluster(cl)
   results <- bind_rows(results)
   summtable <- results %>% group_by(n) %>% summarise(Accuracy = mean(accuracy,na.rm=T),
@@ -199,12 +214,17 @@ estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,upper
 #' #observations being classified into the same class in smaller samples
 #' return(out)
 #' }
-#' # not run
-#' #results <- estimate_accuracy(two_year_recid ~ race +
-#'     #sex + age + juv_fel_count + juv_misd_count + priors_count +
-#'     #charge_degree..misd.fel.,mylogit,br,predictfn = mypred)
-#' #resultsalt <- getpac(results,epsilon=0.5,delta=0.3)
-#' #print(resultsalt$Summary)
+#' \donttest{
+#' library(parallel)
+#' results <- estimate_accuracy(two_year_recid ~ race +
+#'     sex + age + juv_fel_count + juv_misd_count + priors_count +
+#'     charge_degree..misd.fel.,mylogit,br,predictfn = mypred,
+#'     nsample=10,
+#'     steps=10,
+#'     coreoffset = (detectCores() -2))
+#' resultsalt <- getpac(results,epsilon=0.5,delta=0.3)
+#' print(resultsalt$Summary)
+#' }
 #' @export
 getpac <- function(table,epsilon=0.05,delta=0.05){
   results <- table$Raw
@@ -222,13 +242,13 @@ getpac <- function(table,epsilon=0.05,delta=0.05){
 #' @param table A list containing an element named `Raw`. Should always be used with the output of [estimate_accuracy()]
 #' @param metrics A character vector containing the metrics to display in the plot. Can be any of "Accuracy", "Precision", "Recall", "Fscore", "delta", "epsilon"
 #' @param plottype A string giving the graphics package to be used to generate the plot. Can be one of "ggplot" or "plotly"
+#' @param letters A string determining whether delta and epsilon should be given as greek letters in the plot legend. Defaults to Greek lettering but available in case of rendering issues.
 #' @return Either a \link[ggplot2]{ggplot} or \link[plotly]{plot_ly} plot object, depending on the chosen option of `plottype`.
 #' @seealso [estimate_accuracy()], to generate estimated sample complexity bounds.
 #' @importFrom tidyr pivot_longer
 #' @import dplyr
 #' @importFrom ggplot2 ggplot aes geom_line
 #' @importFrom plotly plot_ly layout
-#' @importFrom rlang .data
 #' @examples
 #' mylogit <- function(formula, data){
 #' m <- structure(
@@ -244,28 +264,33 @@ getpac <- function(table,epsilon=0.05,delta=0.05){
 #' #observations being classified into the same class in smaller samples
 #' return(out)
 #' }
-#' #not run
-#' #results <- estimate_accuracy(two_year_recid ~ race + sex + age +
-#'       #juv_fel_count + juv_misd_count + priors_count +
-#'       #charge_degree..misd.fel.,mylogit,br,predictfn = mypred)
-#' #fig <- plot_accuracy(results)
-#' #fig
+#' \donttest{
+#' library(parallel)
+#' results <- estimate_accuracy(two_year_recid ~ race + sex + age +
+#'       juv_fel_count + juv_misd_count + priors_count +
+#'       charge_degree..misd.fel.,mylogit,br,predictfn = mypred,
+#'     nsample=10,
+#'     steps=10,
+#'     coreoffset = (detectCores() -2))
+#'
+#' fig <- plot_accuracy(results,letters="latin")
+#' fig
+#' }
 #' @export
-plot_accuracy <- function(table,metrics=c("Accuracy","Precision","Recall","Fscore","Delta","Epsilon","Power"),plottype = c("ggplot","plotly")){
-
+plot_accuracy <- function(table,metrics=c("Accuracy","Precision","Recall","Fscore","Delta","Epsilon","Power"),plottype = c("ggplot","plotly"),letters = c("greek","latin")){
+  letters <- match.arg(letters)
   toplot <- table$Summary %>%
    select(n,all_of(metrics)) %>%
       pivot_longer(cols=Accuracy:Power,names_to = "Metric",values_to = "Value")
-  if("Delta" %in% metrics){
+  if(("Delta" %in% metrics) & (letters == "greek")){
    toplot$Metric[which(toplot$Metric == "Delta")] <-'\u03B4'
   }
-  if("Epsilon" %in% metrics){
+  if(("Epsilon" %in% metrics) & (letters== "greek")){
     toplot$Metric[which(toplot$Metric == "Epsilon")] <-'\u03B5'
   }
-  plottype <- plottype[1]
+  plottype <- match.arg(plottype)
   if(plottype=="ggplot"){
-    plot<- toplot %>%
-      ggplot(.data,aes(x=n,y=Value,col=Metric,linetype=Metric)) + geom_line()
+    plot<- ggplot(toplot,aes(x=n,y=Value,col=Metric,linetype=Metric)) + geom_line()
   } else if(plottype=="plotly"){
     plot <- plot_ly(toplot, x= ~n, y = ~Value, color = ~Metric, mode = 'lines') %>%
       layout(yaxis = list(title= ""), legend = list(orientation = ''))  #TODO - add ability to change plotly options
