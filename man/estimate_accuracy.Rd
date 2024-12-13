@@ -26,6 +26,9 @@ estimate_accuracy(
   packages = list(),
   method = c("Uniform", "Class Imbalance"),
   p = NULL,
+  minn = ifelse(is.null(data), (dim + 1), (ncol(data) + 1)),
+  x = NULL,
+  y = NULL,
   ...
 )
 }
@@ -71,6 +74,12 @@ estimate_accuracy(
 \item{method}{An optional string stating the distribution from which data is to be generated. Default is i.i.d. uniform sampling. Can also take a function outputting a vector of probabilities if the user wishes to specify a custom distribution.}
 
 \item{p}{If method is 'Class Imbalance', gives the degree of weight placed on the positive class.}
+
+\item{minn}{Optional argument to set a different minimum n than the dimension of the algorithm. Useful with e.g. regularized regression models such as elastic net.}
+
+\item{x}{Optional argument for methods that take separate predictor and outcome data. Specifies a matrix-like object containing predictors. Note that if used, the x and y objects are bound together columnwise; this must be handled in the user-supplied helper function.}
+
+\item{y}{Optional argument for methods that take separate predictor and outcome data. Specifies a vector-like object containing outcome values. Note that if used, the x and y objects are bound together columnwise; this must be handled in the user-supplied helper function.}
 
 \item{...}{Additional arguments that need to be passed to \code{model}}
 }

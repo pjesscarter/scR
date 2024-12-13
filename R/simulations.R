@@ -103,6 +103,9 @@ acc_sim <- function(n,method = "Uniform",p=NULL,...){
 #' @param packages A list of packages that need to be loaded in order to run `model`.
 #' @param method An optional string stating the distribution from which data is to be generated. Default is i.i.d. uniform sampling. Can also take a function outputting a vector of probabilities if the user wishes to specify a custom distribution.
 #' @param p If method is 'Class Imbalance', gives the degree of weight placed on the positive class.
+#' @param minn Optional argument to set a different minimum n than the dimension of the algorithm. Useful with e.g. regularized regression models such as elastic net.
+#' @param x Optional argument for methods that take separate predictor and outcome data. Specifies a matrix-like object containing predictors. Note that if used, the x and y objects are bound together columnwise; this must be handled in the user-supplied helper function.
+#' @param y Optional argument for methods that take separate predictor and outcome data. Specifies a vector-like object containing outcome values. Note that if used, the x and y objects are bound together columnwise; this must be handled in the user-supplied helper function.
 #' @param ... Additional arguments that need to be passed to `model`
 #' @return A `list` containing two named elements. `Raw` gives the exact output of the simulations, while `Summary` gives a table of accuracy metrics, including the achieved levels of \eqn{\epsilon} and \eqn{\delta} given the specified values. Alternative values can be calculated using [getpac()]
 #' @seealso [plot_accuracy()], to represent simulations visually, [getpac()], to calculate summaries for alternate values of \eqn{\epsilon} and \eqn{\delta} without conducting a new simulation, and [gendata()], to generated synthetic datasets.
@@ -139,17 +142,25 @@ acc_sim <- function(n,method = "Uniform",p=NULL,...){
 #' @export
 
 
-estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,upperlimit=NULL,nsample= 30, steps= 50,eta=0.05,delta=0.05,epsilon=0.05,predictfn = NULL,power = FALSE,effect_size=NULL,powersims=NULL,alpha=0.05,parallel = TRUE,coreoffset=0,packages=list(),method = c("Uniform","Class Imbalance"),p=NULL,...){
-  if(is.null(data)){
+estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,upperlimit=NULL,nsample= 30, steps= 50,eta=0.05,delta=0.05,epsilon=0.05,predictfn = NULL,power = FALSE,effect_size=NULL,powersims=NULL,alpha=0.05,parallel = TRUE,coreoffset=0,packages=list(),method = c("Uniform","Class Imbalance"),p=NULL,minn = ifelse(is.null(data),(dim+1),(ncol(data)+1)),x=NULL,y=NULL,...){
+  force(minn)
+  if(is.null(data) & is.null(x)){
     names <- all.vars(formula)
     data <- gendata(model,dim,maxn,predictfn,names,...)
+  } else if(!is.null(x)){
+    if(is.null(y)){
+      simpleError("Predictor matrix specified but no outcome given")
+    }
+    data <- cbind(x,y)
   }
   method <- match.arg(method)
   results <- list()
   outcome <- all.vars(formula)[1]
-  dat <- model.frame(formula,data)
+  if(is.null(x))
+  dat <- ifelse(is.null(x),model.frame(formula,data),data)
   #nvalues <- seq(4,300,15)
-  nvalues <- seq((ncol(dat)+1),ifelse(is.null(upperlimit),nrow(dat),upperlimit),steps)
+  nvalues <- seq(minn,ifelse(is.null(upperlimit),nrow(dat),upperlimit),steps)
+
   # if(!is.null(predictfn)){
   #   predict.svrclass <- predictfn
   # }
@@ -178,7 +189,7 @@ estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,upper
       predict.svrclass <- predictfn
     }
   })
-  results <- suppressWarnings({pblapply(nvalues,acc_sim,method,p,cl=cl)})
+  results <- suppressWarnings({pblapply(nvalues,acc_sim,method,p,separate,cl=cl)})
   stopCluster(cl)
   results <- bind_rows(results)
   summtable <- results %>% group_by(n) %>% summarise(Accuracy = mean(accuracy,na.rm=T),
