@@ -15,6 +15,7 @@ acc_sim <- function(n,method = "Uniform",p=NULL,...){
   rec <- vector()
   fscore <- vector()
   pwr <- vector()
+  oc <- ifelse(split,vector(dat[,ncol(dat)]),dat[[outcome]])
   for(j in seq_len(nsample)){
     skip <- T
     while(skip){
@@ -27,7 +28,7 @@ acc_sim <- function(n,method = "Uniform",p=NULL,...){
         if(is.null(p)){
           stop("Class Imbalance method selected. Please supply a class imbalance parameter.")
         }
-        probs <- ifelse(dat[[outcome]]==1,p,(1-p))
+        probs <- ifelse(oc==1,p,(1-p))
         indices <- sample(seq_len(nrow(dat)),n,prob=probs)
         samp <- dat[indices,]
         error <- rbinom(nrow(samp),1,eta)
@@ -37,13 +38,23 @@ acc_sim <- function(n,method = "Uniform",p=NULL,...){
         samp <- dat[indices,]
         error <- rbinom(nrow(samp),1,eta)
       }
-
-      if(is.factor(samp[[outcome]])){
-        samp$outobs <- factor(ifelse(error,!as.numeric(as.character(samp[[outcome]])),as.numeric(as.character(samp[[outcome]]))),levels=c("0","1"))
+      soc <- ifelse(split,vector(samp[,ncol(dat)]),samp[[outcome]])
+      if(!split){
+        if(is.factor(soc)){
+          samp$outobs <- factor(ifelse(error,!as.numeric(as.character(samp[[outcome]])),as.numeric(as.character(samp[[outcome]]))),levels=c("0","1"))
+        } else{
+          samp$outobs <- factor(ifelse(error,!samp[[outcome]],samp[[outcome]]),levels=c("0","1"))
+        }
+        samp <- samp %>% select(!all_of(outcome))
       } else{
-        samp$outobs <- factor(ifelse(error,!samp[[outcome]],samp[[outcome]]),levels=c("0","1"))
+        if(is.factor(soc)){
+          outobs <- factor(ifelse(error,!as.numeric(as.character(soc)),as.numeric(as.character(soc))),levels=c("0","1"))
+        } else{
+          outobs <- factor(ifelse(error,!soc,soc),levels=c("0","1"))
+        }
+        samp <- cbind(samp[,-1],outobs)
       }
-      samp <- samp %>% select(!all_of(outcome))
+
       m <- tryCatch({model(outobs ~.,data=samp,...
       )},
       error=function(e){
@@ -51,19 +62,20 @@ acc_sim <- function(n,method = "Uniform",p=NULL,...){
         skip <<- T} #TODO - provide useful error message to help diagnose misuse
       )
     }
-    pred <- suppressWarnings({predict(m,dat %>% select(!all_of(outcome)))})
-    accuracy[j] <- mean(as.numeric(levels(pred)[pred])== factor(dat[[outcome]],levels=c("0","1")))
-    prec[j] <- tryCatch({precision(table(levels(pred)[pred],factor(dat[[outcome]],levels=c("0","1"))), relevant = 1)},
+    foc <- factor(oc,levels=c("0","1"))
+    pred <- suppressWarnings({predict(m,ifelse(split,dat[,-1],dat %>% select(!all_of(outcome))))})
+    accuracy[j] <- mean(as.numeric(levels(pred)[pred])== foc)
+    prec[j] <- tryCatch({precision(table(levels(pred)[pred],foc), relevant = 1)},
                         error = function(e){return(NA)})
-    rec[j] <- tryCatch({recall(table(levels(pred)[pred],factor(dat[[outcome]],levels=c("0","1"))), relevant = 1)},
+    rec[j] <- tryCatch({recall(table(levels(pred)[pred],foc), relevant = 1)},
                        error = function(e){return(NA)})
-    fscore[j] <- tryCatch({F_meas(table(levels(pred)[pred],factor(dat[[outcome]],levels=c("0","1"))), relevant = 1)},
+    fscore[j] <- tryCatch({F_meas(table(levels(pred)[pred],foc), relevant = 1)},
                           error = function(e){return(NA)})
 
     if(power){
       reject <- vector()
       Dobs <- as.numeric(levels(pred)[pred])
-      Dtrue <- if(is.factor(dat[[outcome]])){as.numeric(as.character(dat[[outcome]]))} else{dat[[outcome]]}
+      Dtrue <- if(is.factor(oc)){as.numeric(as.character(oc))} else{oc}
       for(r in 1:powersims){
         Y <- effect_size * Dtrue + rnorm(length(Dobs))
         X <- data.frame(D = Dobs, Y = Y)
@@ -144,6 +156,7 @@ acc_sim <- function(n,method = "Uniform",p=NULL,...){
 
 estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,upperlimit=NULL,nsample= 30, steps= 50,eta=0.05,delta=0.05,epsilon=0.05,predictfn = NULL,power = FALSE,effect_size=NULL,powersims=NULL,alpha=0.05,parallel = TRUE,coreoffset=0,packages=list(),method = c("Uniform","Class Imbalance"),p=NULL,minn = ifelse(is.null(data),(dim+1),(ncol(data)+1)),x=NULL,y=NULL,...){
   force(minn)
+  split <- FALSE
   if(is.null(data) & is.null(x)){
     names <- all.vars(formula)
     data <- gendata(model,dim,maxn,predictfn,names,...)
@@ -152,6 +165,7 @@ estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,upper
       simpleError("Predictor matrix specified but no outcome given")
     }
     data <- cbind(x,y)
+    split <- TRUE
   }
   method <- match.arg(method)
   results <- list()
@@ -177,10 +191,10 @@ estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,upper
     }
     cl <- makeCluster(cl)
   } else{
-    cl <- 1
+    cl <- 1L
     cl <- makeCluster(cl)
   }
-  clusterExport(cl,varlist = c("dat","model","eta","packages","predictfn","nsample","outcome","power","effect_size","powersims","alpha"),envir = environment())
+  clusterExport(cl,varlist = c("dat","model","eta","packages","predictfn","nsample","outcome","power","effect_size","powersims","alpha","split"),envir = environment())
   clusterEvalQ(cl=cl,expr={
     library(dplyr)
     library(caret)
