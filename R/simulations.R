@@ -203,7 +203,7 @@ estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,upper
       predict.svrclass <- predictfn
     }
   })
-  results <- suppressWarnings({pblapply(nvalues,acc_sim,method,p,separate,cl=cl)})
+  results <- suppressWarnings({pblapply(nvalues,acc_sim,method,p,cl=cl)})
   stopCluster(cl)
   results <- bind_rows(results)
   summtable <- results %>% group_by(n) %>% summarise(Accuracy = mean(accuracy,na.rm=T),
