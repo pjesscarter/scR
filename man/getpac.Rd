@@ -40,7 +40,7 @@ results <- estimate_accuracy(two_year_recid ~ race +
     sex + age + juv_fel_count + juv_misd_count + priors_count +
     charge_degree..misd.fel.,mylogit,br,predictfn = mypred,
     nsample=10,
-    steps=10,
+    steps=1000,
     coreoffset = (detectCores() -2))
 resultsalt <- getpac(results,epsilon=0.5,delta=0.3)
 print(resultsalt$Summary)

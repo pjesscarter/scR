@@ -3,19 +3,29 @@
 #' @param n An integer giving the desired sample size for which the target function is to be calculated.
 #' @param method An optional string stating the distribution from which data is to be generated. Default is i.i.d. uniform sampling. Currently also supports "Class Imbalance". Can also take a function outputting a vector of probabilities if the user wishes to specify a custom distribution.
 #' @param p If method is 'Class Imbalance', gives the degree of weight placed on the positive class.
+#' @param dat A rectangular `data.frame` or matrix-like object giving the full data from which samples are to be drawn. If left unspecified, [gendata()] is called to produce synthetic data with an appropriate structure.
+#' @param model A function giving the model to be estimated
+#' @param eta A real number between 0 and 1 giving the probability of misclassification error in the training data.
+#' @param nsample A positive integer giving the number of samples to be generated for each value of $n$. Larger values give more accurate results.
+#' @param outcome A string giving the name of the outcome variable.
+#' @param power A logical indicating whether experimental power based on the predictions should also be reported
+#' @param effect_size If `power` is `TRUE`, a real number indicating the scaled effect size the user would like to be able to detect.
+#' @param powersims If `power` is `TRUE`, an integer indicating the number of simulations to be conducted at each step to calculate power.
+#' @param alpha If `power` is `TRUE`, a real number between 0 and 1 indicating the probability of Type I error to be used for hypothesis testing. Default is 0.05.
+#' @param split A logical indicating whether the data was passed as a single data frame or separately.
 #' @param ... Additional model parameters to be specified by the user.
 #' @return A data frame giving performance metrics for the specified sample size.
 #' @importFrom caret precision recall F_meas
 #' @importFrom stats rbinom predict rnorm lm
 #' @import dplyr
 #' @export
-acc_sim <- function(n,method = "Uniform",p=NULL,...){
+acc_sim <- function(n,method,p,dat,model,eta,nsample,outcome,power,effect_size,powersims,alpha,split,...){
   accuracy <- vector()
   prec <- vector()
   rec <- vector()
   fscore <- vector()
   pwr <- vector()
-  oc <- ifelse(split,vector(dat[,ncol(dat)]),dat[[outcome]])
+  if(split){oc <- as.vector(dat[,ncol(dat)])} else{ oc <- dat[[outcome]]}
   for(j in seq_len(nsample)){
     skip <- T
     while(skip){
@@ -38,8 +48,10 @@ acc_sim <- function(n,method = "Uniform",p=NULL,...){
         samp <- dat[indices,]
         error <- rbinom(nrow(samp),1,eta)
       }
-      soc <- ifelse(split,vector(samp[,ncol(dat)]),samp[[outcome]])
+
       if(!split){
+        soc <- samp[[outcome]]
+        predframe <- dat %>% select(!all_of(outcome))
         if(is.factor(soc)){
           samp$outobs <- factor(ifelse(error,!as.numeric(as.character(samp[[outcome]])),as.numeric(as.character(samp[[outcome]]))),levels=c("0","1"))
         } else{
@@ -47,6 +59,8 @@ acc_sim <- function(n,method = "Uniform",p=NULL,...){
         }
         samp <- samp %>% select(!all_of(outcome))
       } else{
+        predframe <- dat[,-1]
+        soc <- as.vector(samp[,ncol(dat)])
         if(is.factor(soc)){
           outobs <- factor(ifelse(error,!as.numeric(as.character(soc)),as.numeric(as.character(soc))),levels=c("0","1"))
         } else{
@@ -63,7 +77,7 @@ acc_sim <- function(n,method = "Uniform",p=NULL,...){
       )
     }
     foc <- factor(oc,levels=c("0","1"))
-    pred <- suppressWarnings({predict(m,ifelse(split,dat[,-1],dat %>% select(!all_of(outcome))))})
+    pred <- suppressWarnings({predict(m,predframe)})
     accuracy[j] <- mean(as.numeric(levels(pred)[pred])== foc)
     prec[j] <- tryCatch({precision(table(levels(pred)[pred],foc), relevant = 1)},
                         error = function(e){return(NA)})
@@ -101,7 +115,7 @@ acc_sim <- function(n,method = "Uniform",p=NULL,...){
 #' @param maxn Required if `data` is unspecified. Gives the vertical dimension of the data (number of observations) to be generated.
 #' @param upperlimit Optional. A positive integer giving the maximum sample size to be simulated, if data was supplied.
 #' @param nsample A positive integer giving the number of samples to be generated for each value of $n$. Larger values give more accurate results.
-#' @param steps A positive integer giving the number of values of $n$ for which simulations should be conducted. Larger values give more accurate results.
+#' @param steps A positive integer giving the interval of values of $n$ for which simulations should be conducted. Larger values give more accurate results.
 #' @param eta A real number between 0 and 1 giving the probability of misclassification error in the training data.
 #' @param delta A real number between 0 and 1 giving the targeted maximum probability of observing an OOS error rate higher than `epsilon`
 #' @param epsilon A real number between 0 and 1 giving the targeted maximum out-of-sample (OOS) error rate
@@ -147,7 +161,7 @@ acc_sim <- function(n,method = "Uniform",p=NULL,...){
 #'     charge_degree..misd.fel.,mylogit,br,
 #'     predictfn = mypred,
 #'     nsample=10,
-#'     steps=10,
+#'     steps=1000,
 #'     coreoffset = (detectCores() -2)
 #'   )
 #' }
@@ -160,18 +174,20 @@ estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,upper
   if(is.null(data) & is.null(x)){
     names <- all.vars(formula)
     data <- gendata(model,dim,maxn,predictfn,names,...)
+    dat <- model.frame(formula,data)
   } else if(!is.null(x)){
     if(is.null(y)){
       simpleError("Predictor matrix specified but no outcome given")
     }
     data <- cbind(x,y)
     split <- TRUE
+    dat <- data
+  } else{
+    dat <- model.frame(formula,data)
   }
   method <- match.arg(method)
   results <- list()
   outcome <- all.vars(formula)[1]
-  if(is.null(x))
-  dat <- ifelse(is.null(x),model.frame(formula,data),data)
   #nvalues <- seq(4,300,15)
   nvalues <- seq(minn,ifelse(is.null(upperlimit),nrow(dat),upperlimit),steps)
 
@@ -194,7 +210,7 @@ estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,upper
     cl <- 1L
     cl <- makeCluster(cl)
   }
-  clusterExport(cl,varlist = c("dat","model","eta","packages","predictfn","nsample","outcome","power","effect_size","powersims","alpha","split"),envir = environment())
+  clusterExport(cl,varlist = c("packages","predictfn"),envir = environment())
   clusterEvalQ(cl=cl,expr={
     library(dplyr)
     library(caret)
@@ -203,7 +219,7 @@ estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,upper
       predict.svrclass <- predictfn
     }
   })
-  results <- suppressWarnings({pblapply(nvalues,acc_sim,method,p,cl=cl)})
+  results <- suppressWarnings({pblapply(nvalues,acc_sim,method=method,p=p,dat=dat,model=model,eta=eta,nsample=nsample,outcome=outcome,power=power,effect_size=effect_size,powersims=powersims,alpha=alpha,split=split,cl=cl,...)})
   stopCluster(cl)
   results <- bind_rows(results)
   summtable <- results %>% group_by(n) %>% summarise(Accuracy = mean(accuracy,na.rm=T),
@@ -245,7 +261,7 @@ estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,upper
 #'     sex + age + juv_fel_count + juv_misd_count + priors_count +
 #'     charge_degree..misd.fel.,mylogit,br,predictfn = mypred,
 #'     nsample=10,
-#'     steps=10,
+#'     steps=1000,
 #'     coreoffset = (detectCores() -2))
 #' resultsalt <- getpac(results,epsilon=0.5,delta=0.3)
 #' print(resultsalt$Summary)
@@ -295,7 +311,7 @@ getpac <- function(table,epsilon=0.05,delta=0.05){
 #'       juv_fel_count + juv_misd_count + priors_count +
 #'       charge_degree..misd.fel.,mylogit,br,predictfn = mypred,
 #'     nsample=10,
-#'     steps=10,
+#'     steps=1000,
 #'     coreoffset = (detectCores() -2))
 #'
 #' fig <- plot_accuracy(results,letters="latin")

@@ -47,7 +47,7 @@ estimate_accuracy(
 
 \item{nsample}{A positive integer giving the number of samples to be generated for each value of $n$. Larger values give more accurate results.}
 
-\item{steps}{A positive integer giving the number of values of $n$ for which simulations should be conducted. Larger values give more accurate results.}
+\item{steps}{A positive integer giving the interval of values of $n$ for which simulations should be conducted. Larger values give more accurate results.}
 
 \item{eta}{A real number between 0 and 1 giving the probability of misclassification error in the training data.}
 
@@ -111,7 +111,7 @@ library(parallel)
     charge_degree..misd.fel.,mylogit,br,
     predictfn = mypred,
     nsample=10,
-    steps=10,
+    steps=1000,
     coreoffset = (detectCores() -2)
   )
 }
