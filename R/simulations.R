@@ -78,12 +78,12 @@ acc_sim <- function(n,method,p,dat,model,eta,nsample,outcome,power,effect_size,p
     }
     foc <- factor(oc,levels=c("0","1"))
     pred <- suppressWarnings({predict(m,predframe)})
-    accuracy[j] <- mean(as.numeric(levels(pred)[pred])== foc)
-    prec[j] <- tryCatch({precision(table(levels(pred)[pred],foc), relevant = 1)},
+    accuracy[j] <- mean(as.numeric(pred== foc))
+    prec[j] <- tryCatch({precision(table(pred,foc), relevant = 1)},
                         error = function(e){return(NA)})
-    rec[j] <- tryCatch({recall(table(levels(pred)[pred],foc), relevant = 1)},
+    rec[j] <- tryCatch({recall(table(pred,foc), relevant = 1)},
                        error = function(e){return(NA)})
-    fscore[j] <- tryCatch({F_meas(table(levels(pred)[pred],foc), relevant = 1)},
+    fscore[j] <- tryCatch({F_meas(table(pred,foc), relevant = 1)},
                           error = function(e){return(NA)})
 
     if(power){
@@ -102,7 +102,7 @@ acc_sim <- function(n,method,p,dat,model,eta,nsample,outcome,power,effect_size,p
     } else{pwr[j] <- NA}
 
   }
-  out <- tryCatch({data.frame(accuracy,prec,rec,fscore,n,pwr)},
+out <- tryCatch({data.frame(accuracy,prec,rec,fscore,n,pwr)},
                   error = function(e){return(NA)})
   return(out)
 }
@@ -189,7 +189,7 @@ estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,upper
   results <- list()
   outcome <- all.vars(formula)[1]
   #nvalues <- seq(4,300,15)
-  nvalues <- seq(minn,ifelse(is.null(upperlimit),nrow(dat),upperlimit),steps)
+  nvalues <- round(seq(minn,ifelse(is.null(upperlimit),nrow(dat),upperlimit),steps),0)
 
   # if(!is.null(predictfn)){
   #   predict.svrclass <- predictfn

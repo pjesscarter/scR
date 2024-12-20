@@ -5,6 +5,7 @@
 #' @param x An integer giving the desired sample size for which the target function is to be approximated.
 #' @param ... Additional model parameters to be specified by the user.
 #' @importFrom stats rnorm predict
+#' @importFrom dplyr bind_rows
 #' @return A real number giving the estimated value of Xi(n), the bounding function
 
 
@@ -84,6 +85,7 @@ loss <- function(h,ngrid,xi,a=0.16,a1=1.2,a11=0.14927){
 #' @param a Scaling coefficient for the bounding function. Defaults to the value given by Vapnik, Levin and Le Cun 1994.
 #' @param a1 Scaling coefficient for the bounding function. Defaults to the value given by Vapnik, Levin and Le Cun 1994.
 #' @param a11 Scaling coefficient for the bounding function. Defaults to the value given by Vapnik, Levin and Le Cun 1994.
+#' @param minn Optional argument to set a different minimum n than the dimension of the algorithm. Useful with e.g. regularized regression models such as elastic net.
 #' @param ... Additional arguments that need to be passed to `model`
 #' @return A real number giving the estimated value of the VC dimension of the supplied model.
 #' @seealso [scb()], to calculate sample complexity bounds given estimated VCD.
@@ -110,8 +112,9 @@ loss <- function(h,ngrid,xi,a=0.16,a1=1.2,a11=0.14927){
 #' vcd <- simvcd(model=mylogit,dim=7,m=10,k=10,maxn=50,predictfn = mypred,
 #'     coreoffset = (detectCores() -2))
 #' @export
-simvcd <- function(model,dim,packages=list(),m=1000,k=1000,maxn=5000,parallel = TRUE,coreoffset=0, predictfn = NULL, a=0.16,a1=1.2,a11=0.14927, ...){
-  ngrid <- seq(dim,maxn,(maxn/k))
+simvcd <- function(model,dim,packages=list(),m=1000,k=1000,maxn=5000,parallel = TRUE,coreoffset=0, predictfn = NULL, a=0.16,a1=1.2,a11=0.14927,minn = (dim+1), ...){
+  force(minn)
+  ngrid <- seq(minn,maxn,(maxn/k))
   if(parallel){
     chk <- Sys.getenv("_R_CHECK_LIMIT_CORES_", "")
 
@@ -140,7 +143,7 @@ simvcd <- function(model,dim,packages=list(),m=1000,k=1000,maxn=5000,parallel = 
   #Need to work on passing function arguments with pbapply - some issues around parallelization
   xihats <- suppressWarnings({pbsapply(ngrid,risk_bounds,...,cl=cl)})
   stopCluster(cl)
-  vcd <- optim((l+1),loss,ngrid=ngrid,xi=xihats, a=a,a1=a1,a11=a11, method="Brent",lower=1,upper = 2*(max(ngrid)), ...)
+  vcd <- optim((l+1),loss,ngrid=ngrid,xi=xihats, a=a,a1=a1,a11=a11, method="Brent",lower=1,upper = 2*(max(ngrid)),...)
   return(vcd$par)
 }
 

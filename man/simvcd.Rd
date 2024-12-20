@@ -17,6 +17,7 @@ simvcd(
   a = 0.16,
   a1 = 1.2,
   a11 = 0.14927,
+  minn = (dim + 1),
   ...
 )
 }
@@ -44,6 +45,8 @@ simvcd(
 \item{a1}{Scaling coefficient for the bounding function. Defaults to the value given by Vapnik, Levin and Le Cun 1994.}
 
 \item{a11}{Scaling coefficient for the bounding function. Defaults to the value given by Vapnik, Levin and Le Cun 1994.}
+
+\item{minn}{Optional argument to set a different minimum n than the dimension of the algorithm. Useful with e.g. regularized regression models such as elastic net.}
 
 \item{...}{Additional arguments that need to be passed to \code{model}}
 }
