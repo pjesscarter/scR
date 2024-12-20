@@ -59,14 +59,14 @@ acc_sim <- function(n,method,p,dat,model,eta,nsample,outcome,power,effect_size,p
         }
         samp <- samp %>% select(!all_of(outcome))
       } else{
-        predframe <- dat[,-1]
+        predframe <- dat[,-ncol(dat)]
         soc <- as.vector(samp[,ncol(dat)])
         if(is.factor(soc)){
           outobs <- factor(ifelse(error,!as.numeric(as.character(soc)),as.numeric(as.character(soc))),levels=c("0","1"))
         } else{
           outobs <- factor(ifelse(error,!soc,soc),levels=c("0","1"))
         }
-        samp <- cbind(samp[,-1],outobs)
+        samp <- cbind(samp[,-ncol(samp)],outobs)
       }
 
       m <- tryCatch({model(outobs ~.,data=samp,...
