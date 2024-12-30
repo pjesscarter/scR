@@ -3,48 +3,52 @@
 #' Utility function to generate data points for estimation of the VC Dimension of a user-specified binary classification algorithm given a specified sample size.
 #'
 #' @param x An integer giving the desired sample size for which the target function is to be approximated.
+#' @param l A positive integer giving dimension (number of input features) of the model.
+#' @param k A positive integer giving the number of design points (sample size values) for which the bounding function is to be estimated. Higher values give more accurate results but increase computation time.
+#' @param m A positive integer giving the number of simulations to be performed at each design point (sample size value). Higher values give more accurate results but increase computation time.
+#' @param model A binary classification model supplied by the user. Must take arguments `formula` and `data`
 #' @param ... Additional model parameters to be specified by the user.
 #' @importFrom stats rnorm predict
+#' @import progressr
 #' @return A real number giving the estimated value of Xi(n), the bounding function
 
 
-risk_bounds <- function(x,...){
+risk_bounds <- function(x,l,k,m,model, ...) {
   n <- x
-  xis <- vector()
-  for(j in 1:m){
-    skip <- T
-    while(skip){
-      skip <- F
-      x <- replicate(l,rnorm(2*n))
+  xis <- numeric(m)  # Preallocate memory
+  for (j in 1:m) {
+    repeat {
+      x <- matrix(rnorm(2 * n * l), nrow = 2 * n, ncol = l)  # Use matrix
       coeff <- rnorm(l)
-      y <- as.numeric(apply(x,1,FUN=function(r){r %*% coeff}) > 0)
-      dat <- data.frame(x,y)
-      indices <- sample(1:n,n)
-      W <- dat[indices,]
-      Wprime <- dat[-indices,]
-      #Flip labels
-      Wprime$y <- 1- Wprime$y
-      dat <- bind_rows(W, Wprime)
-      #Flip labels again to recover correct values
-      Wprime$y <- 1- Wprime$y
-      traindata <- dat
-      traindata$y <- factor(traindata$y,levels=c("0","1"))
-      #Models tend to use different syntax so we might need to provide a list of supported functions
-      fhat <- tryCatch({model(formula = y ~ .,data = traindata)},
-                       error=function(e){
-                         warning("Model failed to compute, regenerating training data")
-                         skip <<- T}
-      )
-    }
+      y <- as.numeric(rowSums(x * coeff) > 0)  # Vectorized operation
 
-    #Different models also use different predict methods
-    RW <- mean(predict(fhat,W[,-(l+1)]) != factor(W$y,levels=c("0","1")))
-    RWprime <- mean(predict(fhat,Wprime[,-(l+1)]) != factor(Wprime$y,levels=c("0","1")))
+      W_idx <- sample(1:(2 * n), n)
+      W <- x[W_idx, ]
+      Wprime <- x[-W_idx, ]
+      Wprime_y <- 1 - y[-W_idx]  # Flip labels
+
+      y_train <- c(y[W_idx], Wprime_y)
+      x_train <- rbind(W, Wprime)
+
+      # Train model
+      fhat <- tryCatch(
+        model(formula = y ~ ., data = data.frame(y = factor(y_train), x_train)),
+        error = function(e) return(NULL)
+      )
+      gc()
+      if (!is.null(fhat)) break
+    }
+    p()
+
+    # Predict and compute RW and RWprime
+    RW <- mean(predict(fhat, W) != factor(y[W_idx]))
+    RWprime <- mean(predict(fhat, Wprime) != factor(1 - Wprime_y))
     xis[j] <- abs(RW - RWprime)
+    gc()
   }
-  xihat <- mean(xis)
-  return(xihat)
+  return(mean(xis))
 }
+
 
 #' Utility function to define the least-squares loss function to be optimized for [simvcd()]
 #'
@@ -87,10 +91,13 @@ loss <- function(h,ngrid,xi,a=0.16,a1=1.2,a11=0.14927){
 #' @param ... Additional arguments that need to be passed to `model`
 #' @return A real number giving the estimated value of the VC dimension of the supplied model.
 #' @seealso [scb()], to calculate sample complexity bounds given estimated VCD.
-#' @import parallel
+#' @importFrom parallel detectCores
+#' @importFrom future plan
+#' @importFrom furrr future_map_dbl
 #' @import dplyr
 #' @importFrom pbapply pbsapply
 #' @importFrom stats optim
+#' @importFrom progressr progressor
 #' @examples
 #' mylogit <- function(formula, data){
 #' m <- structure(
@@ -122,21 +129,19 @@ simvcd <- function(model,dim,packages=list(),m=1000,k=1000,maxn=5000,parallel = 
       # use all cores in devtools::test()
       cl <- detectCores() -coreoffset
     }
-    cl <- makeCluster(cl)
   } else{
     cl <- 1
-    cl <- makeCluster(cl)
   }
-
   l<-dim
-  clusterExport(cl,varlist = c("l","k","m","model","packages","predictfn"),envir = environment())
-  clusterEvalQ(cl=cl,expr={
-    library(dplyr)
-    lapply(packages, library, character.only = TRUE)
-    if(!is.null(predictfn)){
-      predict.svrclass <- predictfn
-    }
-  })
+  lapply(packages, library, character.only = TRUE)
+  if(!is.null(predictfn)){
+    predict.svrclass <- predictfn
+  }
+  plan(cluster, workers = cl)  # Use multicore backend
+  p <- progressor(steps = length(ngrid))
+  xihats <- future_map_dbl(ngrid, risk_bounds,l=l,k=k,m=m,model=model, ...)
+  vcd <- optim((dim + 1), loss, ngrid = ngrid, xi = xihats, ...)
+  clusterExport(cl,varlist = c("l","k","m","model"),envir = environment())
   #Need to work on passing function arguments with pbapply - some issues around parallelization
   xihats <- suppressWarnings({pbsapply(ngrid,risk_bounds,...,cl=cl)})
   stopCluster(cl)

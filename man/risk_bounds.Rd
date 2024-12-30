@@ -4,10 +4,18 @@
 \alias{risk_bounds}
 \title{Utility function to generate data points for estimation of the VC Dimension of a user-specified binary classification algorithm given a specified sample size.}
 \usage{
-risk_bounds(x, ...)
+risk_bounds(x, l, k, m, model, ...)
 }
 \arguments{
 \item{x}{An integer giving the desired sample size for which the target function is to be approximated.}
+
+\item{l}{A positive integer giving dimension (number of input features) of the model.}
+
+\item{k}{A positive integer giving the number of design points (sample size values) for which the bounding function is to be estimated. Higher values give more accurate results but increase computation time.}
+
+\item{m}{A positive integer giving the number of simulations to be performed at each design point (sample size value). Higher values give more accurate results but increase computation time.}
+
+\item{model}{A binary classification model supplied by the user. Must take arguments \code{formula} and \code{data}}
 
 \item{...}{Additional model parameters to be specified by the user.}
 }
