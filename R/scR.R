@@ -10,7 +10,6 @@
 #' @param ... Additional model parameters to be specified by the user.
 #' @importFrom stats rnorm predict
 #' @importFrom dplyr bind_rows
-#' @import progressr
 #' @return A real number giving the estimated value of Xi(n), the bounding function
 
 
@@ -44,7 +43,6 @@ risk_bounds <- function(x,l,k,m,model, ...) {
       gc()
       if (!is.null(fhat)) break
     }
-    p()
 
     # Predict and compute RW and RWprime
     RW <- mean(predict(fhat, W) != factor(y[W_idx]))
@@ -101,8 +99,8 @@ loss <- function(h,ngrid,xi,a=0.16,a1=1.2,a11=0.14927){
 #' @return A real number giving the estimated value of the VC dimension of the supplied model.
 #' @seealso [scb()], to calculate sample complexity bounds given estimated VCD.
 #' @importFrom parallel detectCores
-#' @importFrom future plan
-#' @importFrom furrr future_map_dbl
+#' @importFrom future plan cluster
+#' @importFrom furrr future_map_dbl furrr_options
 #' @import dplyr
 #' @importFrom pbapply pbsapply
 #' @importFrom stats optim
@@ -150,7 +148,12 @@ simvcd <- function(model,dim,packages=list(),m=1000,k=1000,maxn=5000,parallel = 
   }
   plan(cluster, workers = cl)  # Use multicore backend
   p <- progressor(steps = length(ngrid))
-  xihats <- future_map_dbl(ngrid, risk_bounds,l=l,k=k,m=m,model=model, ...)
+  temp <- function(x,l,k,m,model, ...){
+    p()
+    r <- risk_bounds(x=x,l=l,k=k,m=m,model=model,...)
+    return(r)
+  }
+  xihats <- future_map_dbl(ngrid, temp,l=l,k=k,m=m,model=model,...,.options = furrr_options(seed = TRUE))
   vcd <- optim((l+1),loss,ngrid=ngrid,xi=xihats, a=a,a1=a1,a11=a11, method="Brent",lower=1,upper = 2*(max(ngrid)),...)
   return(vcd$par)
 }
