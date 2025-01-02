@@ -7,7 +7,6 @@
 simvcd(
   model,
   dim,
-  packages = list(),
   m = 1000,
   k = 1000,
   maxn = 5000,
@@ -18,6 +17,8 @@ simvcd(
   a1 = 1.2,
   a11 = 0.14927,
   minn = (dim + 1),
+  backend = c("multisession", "multicore", "cluster", "sequential"),
+  packages = list(),
   ...
 )
 }
@@ -25,8 +26,6 @@ simvcd(
 \item{model}{A binary classification model supplied by the user. Must take arguments \code{formula} and \code{data}}
 
 \item{dim}{A positive integer giving dimension (number of input features) of the model.}
-
-\item{packages}{A \code{list} of strings giving the names of packages to be loaded in order to estimate the model.}
 
 \item{m}{A positive integer giving the number of simulations to be performed at each design point (sample size value). Higher values give more accurate results but increase computation time.}
 
@@ -47,6 +46,10 @@ simvcd(
 \item{a11}{Scaling coefficient for the bounding function. Defaults to the value given by Vapnik, Levin and Le Cun 1994.}
 
 \item{minn}{Optional argument to set a different minimum n than the dimension of the algorithm. Useful with e.g. regularized regression models such as elastic net.}
+
+\item{backend}{One of the parallel backends used by \code{\link[future:plan]{future::plan()}}. See package documentation for more details.}
+
+\item{packages}{A \code{list} of strings giving the names of packages to be loaded in order to estimate the model.}
 
 \item{...}{Additional arguments that need to be passed to \code{model}}
 }

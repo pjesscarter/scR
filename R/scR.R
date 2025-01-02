@@ -4,23 +4,33 @@
 #'
 #' @param x An integer giving the desired sample size for which the target function is to be approximated.
 #' @param l A positive integer giving dimension (number of input features) of the model.
-#' @param k A positive integer giving the number of design points (sample size values) for which the bounding function is to be estimated. Higher values give more accurate results but increase computation time.
 #' @param m A positive integer giving the number of simulations to be performed at each design point (sample size value). Higher values give more accurate results but increase computation time.
 #' @param model A binary classification model supplied by the user. Must take arguments `formula` and `data`
+#' @param predictfn An optional user-defined function giving a custom predict method. If also using a user-defined model, the `model` should output an object of class `"svrclass"` to avoid errors.
+#' @param sparse Logical indicating whether sparse matrix generation should be used to save on memory. Defaults to false for better accuracy.
+#' @param density Real number between 0 and 1 giving the proportion of non 0 entries in the sparse matrix. Used only if sparse is TRUE.
 #' @param ... Additional model parameters to be specified by the user.
 #' @importFrom stats rnorm predict
 #' @importFrom dplyr bind_rows
+#' @importFrom Matrix rsparsematrix
 #' @return A real number giving the estimated value of Xi(n), the bounding function
 
 
-risk_bounds <- function(x,l,k,m,model, ...) {
+risk_bounds <- function(x, l, m, model,predictfn, sparse,density=NULL,...) {
   n <- x
+  if(!is.null(predictfn)){
+    predict.svrclass <- predictfn
+  }
   xis <- numeric(m)  # Preallocate memory
   for (j in 1:m) {
-    repeat {
-      x <- matrix(rnorm(2 * n * l), nrow = 2 * n, ncol = l)  # Use matrix
+    for (attempt in 1:100) {  # Limit attempts to avoid infinite loop
+      if(sparse){
 
+        x <- rsparsematrix(nrow = 2 * n, ncol = l,density=density)  # Use sparse matrix to save memory
+      } else{
 
+        x <- matrix(rnorm(2 * n * l), nrow = 2 * n, ncol = l)
+      }
       coeff <- rnorm(l)
       y <- as.numeric(rowSums(x * coeff) > 0)  # Vectorized operation
 
@@ -34,25 +44,25 @@ risk_bounds <- function(x,l,k,m,model, ...) {
 
       # Train model
       fhat <- tryCatch(
-        model(formula = y ~ ., data = data.frame(y = factor(y_train), x_train)),
-        error = function(e) return(NULL)
-
-
-
+        model(formula = y ~ ., data = cbind(y_train,x_train), ...
+              ),
+        error = function(e) NULL
       )
+      if (!is.null(fhat)) break  # Exit loop if model trains successfully
+
       gc()
-      if (!is.null(fhat)) break
+      if (attempt == 10) stop("Failed to train model after 100 attempts.")
     }
 
     # Predict and compute RW and RWprime
-    RW <- mean(predict(fhat, W) != factor(y[W_idx]))
-    RWprime <- mean(predict(fhat, Wprime) != factor(1 - Wprime_y))
+    RW <- suppressWarnings(mean(predict(fhat, W) != factor(y[W_idx])))
+    RWprime <- suppressWarnings(mean(predict(fhat, Wprime) != factor(1 - Wprime_y)))
     xis[j] <- abs(RW - RWprime)
-    gc()
+    #gc()
   }
   return(mean(xis))
-
 }
+
 
 
 
@@ -77,7 +87,7 @@ loss <- function(h,ngrid,xi,a=0.16,a1=1.2,a11=0.14927){
   devs <- (xi - phihats)^2
   out <- sum(devs)
   return(out)
-  #Todo - add gradient (very messy function but straightforward to derive)
+  #TODO - add gradient (very messy function but straightforward to derive)
 }
 
 #' Estimate the Vapnik-Chervonenkis (VC) dimension of an arbitrary binary classification algorithm.
@@ -85,7 +95,6 @@ loss <- function(h,ngrid,xi,a=0.16,a1=1.2,a11=0.14927){
 #' @param model A binary classification model supplied by the user. Must take arguments `formula` and `data`
 #' @param dim A positive integer giving dimension (number of input features) of the model.
 #' @param maxn Gives the vertical dimension of the data (number of observations) to be generated.
-#' @param packages A `list` of strings giving the names of packages to be loaded in order to estimate the model.
 #' @param m A positive integer giving the number of simulations to be performed at each design point (sample size value). Higher values give more accurate results but increase computation time.
 #' @param k A positive integer giving the number of design points (sample size values) for which the bounding function is to be estimated. Higher values give more accurate results but increase computation time.
 #' @param parallel Boolean indicating whether or not to use parallel processing.
@@ -95,6 +104,10 @@ loss <- function(h,ngrid,xi,a=0.16,a1=1.2,a11=0.14927){
 #' @param a1 Scaling coefficient for the bounding function. Defaults to the value given by Vapnik, Levin and Le Cun 1994.
 #' @param a11 Scaling coefficient for the bounding function. Defaults to the value given by Vapnik, Levin and Le Cun 1994.
 #' @param minn Optional argument to set a different minimum n than the dimension of the algorithm. Useful with e.g. regularized regression models such as elastic net.
+#' @param sparse Logical indicating whether sparse matrix generation should be used to save on memory. Defaults to false for better accuracy.
+#' @param density Real number between 0 and 1 giving the proportion of non 0 entries in the sparse matrix. Used only if sparse is TRUE.
+#' @param backend One of the parallel backends used by [future::plan()]. See function documentation for more details.
+#' @param packages A `list` of strings giving the names of packages to be loaded in order to estimate the model.
 #' @param ... Additional arguments that need to be passed to `model`
 #' @return A real number giving the estimated value of the VC dimension of the supplied model.
 #' @seealso [scb()], to calculate sample complexity bounds given estimated VCD.
@@ -124,9 +137,10 @@ loss <- function(h,ngrid,xi,a=0.16,a1=1.2,a11=0.14927){
 #' vcd <- simvcd(model=mylogit,dim=7,m=10,k=10,maxn=50,predictfn = mypred,
 #'     coreoffset = (detectCores() -2))
 #' @export
-simvcd <- function(model,dim,packages=list(),m=1000,k=1000,maxn=5000,parallel = TRUE,coreoffset=0, predictfn = NULL, a=0.16,a1=1.2,a11=0.14927,minn = (dim+1), ...){
+simvcd <- function(model,dim,m=1000,k=1000,maxn=5000,parallel = TRUE,coreoffset=0, predictfn = NULL, a=0.16,a1=1.2,a11=0.14927,minn = (dim+1),sparse=FALSE,density=NULL,backend = c("multisession","multicore","cluster","sequential"),packages=list(), ...){
   force(minn)
-  ngrid <- seq(minn,maxn,(maxn/k))
+  ngrid <- round(seq(minn,maxn,(maxn/k)),0)
+  backend <- match.arg(backend)
   if(parallel){
     chk <- Sys.getenv("_R_CHECK_LIMIT_CORES_", "")
 
@@ -142,18 +156,16 @@ simvcd <- function(model,dim,packages=list(),m=1000,k=1000,maxn=5000,parallel = 
   }
 
   l<-dim
-  lapply(packages, library, character.only = TRUE)
-  if(!is.null(predictfn)){
-    predict.svrclass <- predictfn
-  }
-  plan(cluster, workers = cl)  # Use multicore backend
+  plan(get(backend), workers = cl)  # Use chosen backend
   p <- progressor(steps = length(ngrid))
-  temp <- function(x,l,k,m,model, ...){
+  temp <- function(x,l,m,model,packages,predictfn,density, ...){
     p()
-    r <- risk_bounds(x=x,l=l,k=k,m=m,model=model,...)
+    #set.seed(as.numeric(Sys.time()))
+    lapply(packages, library, character.only = TRUE)
+    r <- risk_bounds(x=x,l=l,m=m,model=model,predictfn=predictfn,sparse=sparse,density=density,...)
     return(r)
   }
-  xihats <- future_map_dbl(ngrid, temp,l=l,k=k,m=m,model=model,...,.options = furrr_options(seed = TRUE))
+  xihats <- future_map_dbl(ngrid, temp,l=l,m=m,model=model,packages=packages,predictfn=predictfn,sparse=sparse,density=density,...,.options = furrr_options(seed = TRUE))
   vcd <- optim((l+1),loss,ngrid=ngrid,xi=xihats, a=a,a1=a1,a11=a11, method="Brent",lower=1,upper = 2*(max(ngrid)),...)
   return(vcd$par)
 }

@@ -188,7 +188,6 @@ estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,upper
   method <- match.arg(method)
   results <- list()
   outcome <- all.vars(formula)[1]
-  #nvalues <- seq(4,300,15)
   nvalues <- round(seq(minn,ifelse(is.null(upperlimit),nrow(dat),upperlimit),steps),0)
 
   # if(!is.null(predictfn)){
