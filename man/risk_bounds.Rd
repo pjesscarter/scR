@@ -4,7 +4,7 @@
 \alias{risk_bounds}
 \title{Utility function to generate data points for estimation of the VC Dimension of a user-specified binary classification algorithm given a specified sample size.}
 \usage{
-risk_bounds(x, l, m, model, predictfn, ...)
+risk_bounds(x, l, m, model, predictfn, sparse, density = NULL, ...)
 }
 \arguments{
 \item{x}{An integer giving the desired sample size for which the target function is to be approximated.}
@@ -16,6 +16,10 @@ risk_bounds(x, l, m, model, predictfn, ...)
 \item{model}{A binary classification model supplied by the user. Must take arguments \code{formula} and \code{data}}
 
 \item{predictfn}{An optional user-defined function giving a custom predict method. If also using a user-defined model, the \code{model} should output an object of class \code{"svrclass"} to avoid errors.}
+
+\item{sparse}{Logical indicating whether sparse matrix generation should be used to save on memory. Defaults to false for better accuracy.}
+
+\item{density}{Real number between 0 and 1 giving the proportion of non 0 entries in the sparse matrix. Used only if sparse is TRUE.}
 
 \item{...}{Additional model parameters to be specified by the user.}
 }

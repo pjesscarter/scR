@@ -11,7 +11,6 @@
 #' @param density Real number between 0 and 1 giving the proportion of non 0 entries in the sparse matrix. Used only if sparse is TRUE.
 #' @param ... Additional model parameters to be specified by the user.
 #' @importFrom stats rnorm predict
-#' @importFrom dplyr bind_rows
 #' @importFrom Matrix rsparsematrix
 #' @return A real number giving the estimated value of Xi(n), the bounding function
 
@@ -32,7 +31,7 @@ risk_bounds <- function(x, l, m, model,predictfn, sparse,density=NULL,...) {
         x <- matrix(rnorm(2 * n * l), nrow = 2 * n, ncol = l)
       }
       coeff <- rnorm(l)
-      y <- as.numeric(rowSums(x * coeff) > 0)  # Vectorized operation
+      y <- as.numeric(((x %*% coeff) > 0))
 
       W_idx <- sample(1:(2 * n), n)
       W <- x[W_idx, ]
@@ -158,7 +157,7 @@ simvcd <- function(model,dim,m=1000,k=1000,maxn=5000,parallel = TRUE,coreoffset=
   l<-dim
   plan(get(backend), workers = cl)  # Use chosen backend
   p <- progressor(steps = length(ngrid))
-  temp <- function(x,l,m,model,packages,predictfn,density, ...){
+  temp <- function(x,l,m,model,packages,predictfn,sparse,density,...){
     p()
     #set.seed(as.numeric(Sys.time()))
     lapply(packages, library, character.only = TRUE)

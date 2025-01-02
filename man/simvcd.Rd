@@ -17,6 +17,8 @@ simvcd(
   a1 = 1.2,
   a11 = 0.14927,
   minn = (dim + 1),
+  sparse = FALSE,
+  density = NULL,
   backend = c("multisession", "multicore", "cluster", "sequential"),
   packages = list(),
   ...
@@ -47,7 +49,11 @@ simvcd(
 
 \item{minn}{Optional argument to set a different minimum n than the dimension of the algorithm. Useful with e.g. regularized regression models such as elastic net.}
 
-\item{backend}{One of the parallel backends used by \code{\link[future:plan]{future::plan()}}. See package documentation for more details.}
+\item{sparse}{Logical indicating whether sparse matrix generation should be used to save on memory. Defaults to false for better accuracy.}
+
+\item{density}{Real number between 0 and 1 giving the proportion of non 0 entries in the sparse matrix. Used only if sparse is TRUE.}
+
+\item{backend}{One of the parallel backends used by \code{\link[future:plan]{future::plan()}}. See function documentation for more details.}
 
 \item{packages}{A \code{list} of strings giving the names of packages to be loaded in order to estimate the model.}
 
