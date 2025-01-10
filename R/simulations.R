@@ -13,18 +13,22 @@
 #' @param powersims If `power` is `TRUE`, an integer indicating the number of simulations to be conducted at each step to calculate power.
 #' @param alpha If `power` is `TRUE`, a real number between 0 and 1 indicating the probability of Type I error to be used for hypothesis testing. Default is 0.05.
 #' @param split A logical indicating whether the data was passed as a single data frame or separately.
+#' @param predictfn An optional user-defined function giving a custom predict method. If also using a user-defined model, the `model` should output an object of class `"svrclass"` to avoid errors.
 #' @param ... Additional model parameters to be specified by the user.
 #' @return A data frame giving performance metrics for the specified sample size.
 #' @importFrom caret precision recall F_meas
 #' @importFrom stats rbinom predict rnorm lm
 #' @import dplyr
 #' @export
-acc_sim <- function(n,method,p,dat,model,eta,nsample,outcome,power,effect_size,powersims,alpha,split,...){
-  accuracy <- vector()
-  prec <- vector()
-  rec <- vector()
-  fscore <- vector()
-  pwr <- vector()
+acc_sim <- function(n,method,p,dat,model,eta,nsample,outcome,power,effect_size,powersims,alpha,split,predictfn,...){
+  if(!is.null(predictfn)){
+    predict.svrclass <- predictfn
+  }
+  accuracy <- vector("numeric",nsample)
+  prec <- vector("numeric",nsample)
+  rec <- vector("numeric",nsample)
+  fscore <- vector("numeric",nsample)
+  if(power){pwr <- vector("numeric",nsample)}
   if(split){oc <- as.vector(dat[,ncol(dat)])} else{ oc <- dat[[outcome]]}
   for(j in seq_len(nsample)){
     skip <- T
@@ -209,16 +213,19 @@ estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,upper
     cl <- 1L
     cl <- makeCluster(cl)
   }
-  clusterExport(cl,varlist = c("packages","predictfn"),envir = environment())
-  clusterEvalQ(cl=cl,expr={
-    library(dplyr)
-    library(caret)
+
+  plan(get(backend), workers = cl)  # Use chosen backend
+  p <- progressor(steps = length(ngrid))
+  temp <- function(x,method,p,dat,model,eta,nsample,outcome,power,effect_size,powersims,alpha,split,predictfn,...){
+    p()
+    #set.seed(as.numeric(Sys.time()))
     lapply(packages, library, character.only = TRUE)
-    if(!is.null(predictfn)){
-      predict.svrclass <- predictfn
-    }
-  })
-  results <- suppressWarnings({pblapply(nvalues,acc_sim,method=method,p=p,dat=dat,model=model,eta=eta,nsample=nsample,outcome=outcome,power=power,effect_size=effect_size,powersims=powersims,alpha=alpha,split=split,cl=cl,...)})
+    r <- acc_sim(n=x,method=method,p=p,dat=dat,model=model,eta=eta,nsample=nsample,outcome=outcome,power=power,effect_size=effect_size,powersims=powersims,alpha=alpha,split=split,cl=cl,predictfn=predictfn,...)
+    return(r)
+  }
+  results <- future_map_dbl(nvalues, temp,l=l,m=m,model=model,packages=packages,predictfn=predictfn,sparse=sparse,density=density,...,.options = furrr_options(seed = TRUE))
+
+  results <- suppressWarnings({pblapply(nvalues,acc_sim,)})
   stopCluster(cl)
   results <- bind_rows(results)
   summtable <- results %>% group_by(n) %>% summarise(Accuracy = mean(accuracy,na.rm=T),

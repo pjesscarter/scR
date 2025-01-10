@@ -114,7 +114,6 @@ loss <- function(h,ngrid,xi,a=0.16,a1=1.2,a11=0.14927){
 #' @importFrom future plan cluster
 #' @importFrom furrr future_map_dbl furrr_options
 #' @import dplyr
-#' @importFrom pbapply pbsapply
 #' @importFrom stats optim
 #' @importFrom progressr progressor
 #' @examples
