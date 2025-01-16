@@ -20,96 +20,78 @@
 #' @importFrom stats rbinom predict rnorm lm
 #' @import dplyr
 #' @export
-acc_sim <- function(n,method,p,dat,model,eta,nsample,outcome,power,effect_size,powersims,alpha,split,predictfn,...){
-  if(!is.null(predictfn)){
+acc_sim <- function(n, method, p, dat, model, eta, nsample, outcome, power, effect_size, powersims, alpha, split, predictfn, ...) {
+  if (!is.null(predictfn)) {
     predict.svrclass <- predictfn
   }
-  accuracy <- vector("numeric",nsample)
-  prec <- vector("numeric",nsample)
-  rec <- vector("numeric",nsample)
-  fscore <- vector("numeric",nsample)
-  if(power){pwr <- vector("numeric",nsample)}
-  if(split){oc <- as.vector(dat[,ncol(dat)])} else{ oc <- dat[[outcome]]}
-  for(j in seq_len(nsample)){
-    skip <- T
-    while(skip){
-      skip <- F
-      if(method=="Uniform"){
-        indices <- sample(seq_len(nrow(dat)),n)
-        samp <- dat[indices,]
-        error <- rbinom(nrow(samp),1,eta)
-      } else if(method=="Class Imbalance"){
-        if(is.null(p)){
-          stop("Class Imbalance method selected. Please supply a class imbalance parameter.")
-        }
-        probs <- ifelse(oc==1,p,(1-p))
-        indices <- sample(seq_len(nrow(dat)),n,prob=probs)
-        samp <- dat[indices,]
-        error <- rbinom(nrow(samp),1,eta)
-      } else{
+
+  accuracy <- numeric(nsample)
+  prec <- numeric(nsample)
+  rec <- numeric(nsample)
+  fscore <- numeric(nsample)
+  pwr <- if (power) numeric(nsample) else NULL
+
+  oc <- if (split) as.vector(dat[, ncol(dat)]) else dat[[outcome]]
+
+  for (j in seq_len(nsample)) {
+    for (attempt in 1:100) {
+      if (method == "Uniform") {
+        indices <- sample(seq_len(nrow(dat)), n)
+        samp <- dat[indices, , drop = FALSE]
+        error <- rbinom(n, 1, eta)
+      } else if (method == "Class Imbalance") {
+        if (is.null(p)) stop("Class Imbalance method selected. Please supply a class imbalance parameter.")
+        probs <- ifelse(oc == 1, p, 1 - p)
+        indices <- sample(seq_len(nrow(dat)), n, prob = probs)
+        samp <- dat[indices, , drop = FALSE]
+        error <- rbinom(n, 1, eta)
+      } else {
         probs <- method(dat)
-        indices <- sample(seq_len(nrow(dat)),n,prob=probs)
-        samp <- dat[indices,]
-        error <- rbinom(nrow(samp),1,eta)
+        indices <- sample(seq_len(nrow(dat)), n, prob = probs)
+        samp <- dat[indices, , drop = FALSE]
+        error <- rbinom(n, 1, eta)
       }
 
-      if(!split){
+      if (!split) {
         soc <- samp[[outcome]]
-        predframe <- dat %>% select(!all_of(outcome))
-        if(is.factor(soc)){
-          samp$outobs <- factor(ifelse(error,!as.numeric(as.character(samp[[outcome]])),as.numeric(as.character(samp[[outcome]]))),levels=c("0","1"))
-        } else{
-          samp$outobs <- factor(ifelse(error,!samp[[outcome]],samp[[outcome]]),levels=c("0","1"))
-        }
-        samp <- samp %>% select(!all_of(outcome))
-      } else{
-        predframe <- dat[,-ncol(dat)]
-        soc <- as.vector(samp[,ncol(dat)])
-        if(is.factor(soc)){
-          outobs <- factor(ifelse(error,!as.numeric(as.character(soc)),as.numeric(as.character(soc))),levels=c("0","1"))
-        } else{
-          outobs <- factor(ifelse(error,!soc,soc),levels=c("0","1"))
-        }
-        samp <- cbind(samp[,-ncol(samp)],outobs)
+        samp$outobs <- factor(ifelse(error, !as.numeric(soc), as.numeric(soc)), levels = c("0", "1"))
+        samp <- samp[, !(names(samp) %in% outcome), drop = FALSE]
+      } else {
+        soc <- as.vector(samp[, ncol(samp)])
+        samp$outobs <- factor(ifelse(error, !as.numeric(soc), as.numeric(soc)), levels = c("0", "1"))
+        samp <- cbind(samp[, -ncol(samp), drop = FALSE], outobs = samp$outobs)
       }
 
-      m <- tryCatch({model(outobs ~.,data=samp,...
-      )},
-      error=function(e){
-        warning("Model failed to compute, regenerating training data")
-        skip <<- T} #TODO - provide useful error message to help diagnose misuse
-      )
+      m <- tryCatch(model(outobs ~ ., data = samp, ...),
+                    error = function(e) NULL)
+
+      if (!is.null(m)) break
+      gc()
+      if(attempt == 100) stop("Failed to train model after 100 attempts.")
     }
-    foc <- factor(oc,levels=c("0","1"))
-    pred <- suppressWarnings({predict(m,predframe)})
-    accuracy[j] <- mean(as.numeric(pred== foc))
-    prec[j] <- tryCatch({precision(table(pred,foc), relevant = 1)},
-                        error = function(e){return(NA)})
-    rec[j] <- tryCatch({recall(table(pred,foc), relevant = 1)},
-                       error = function(e){return(NA)})
-    fscore[j] <- tryCatch({F_meas(table(pred,foc), relevant = 1)},
-                          error = function(e){return(NA)})
 
-    if(power){
-      reject <- vector()
+    foc <- factor(oc, levels = c("0", "1"))
+    pred <- suppressWarnings(predict(m, dat[, -ncol(dat), drop = FALSE]))
+    accuracy[j] <- mean(as.numeric(pred == foc))
+    prec[j] <- tryCatch(precision(table(pred, foc), relevant = 1), error = function(e) NA)
+    rec[j] <- tryCatch(recall(table(pred, foc), relevant = 1), error = function(e) NA)
+    fscore[j] <- tryCatch(F_meas(table(pred, foc), relevant = 1), error = function(e) NA)
+
+    if (power) {
       Dobs <- as.numeric(levels(pred)[pred])
-      Dtrue <- if(is.factor(oc)){as.numeric(as.character(oc))} else{oc}
-      for(r in 1:powersims){
+      Dtrue <- as.numeric(oc)
+      reject <- replicate(powersims, {
         Y <- effect_size * Dtrue + rnorm(length(Dobs))
-        X <- data.frame(D = Dobs, Y = Y)
-        mdl <- lm(Y ~ D, data=X)
-        reject[r] <- tryCatch({summary(mdl)$coefficients[2,4] < alpha},
-                              error = function(e){return(NA)})
-      }
-      pwr[j] <- mean(reject,na.rm=T)
-
-    } else{pwr[j] <- NA}
-
+        mdl <- lm(Y ~ Dobs)
+        summary(mdl)$coefficients[2, 4] < alpha
+      })
+      pwr[j] <- mean(reject, na.rm = TRUE)
+    }
   }
-out <- tryCatch({data.frame(accuracy,prec,rec,fscore,n,pwr)},
-                  error = function(e){return(NA)})
-  return(out)
+
+  data.frame(accuracy, prec, rec, fscore, n, pwr = if (power) pwr else NA)
 }
+
 #' Estimate sample complexity bounds for a binary classification algorithm using either simulated or user-supplied data.
 #'
 #' @param formula A `formula` that can be passed to the `model` argument to define the classification algorithm
@@ -139,10 +121,11 @@ out <- tryCatch({data.frame(accuracy,prec,rec,fscore,n,pwr)},
 #' @param ... Additional arguments that need to be passed to `model`
 #' @return A `list` containing two named elements. `Raw` gives the exact output of the simulations, while `Summary` gives a table of accuracy metrics, including the achieved levels of \eqn{\epsilon} and \eqn{\delta} given the specified values. Alternative values can be calculated using [getpac()]
 #' @seealso [plot_accuracy()], to represent simulations visually, [getpac()], to calculate summaries for alternate values of \eqn{\epsilon} and \eqn{\delta} without conducting a new simulation, and [gendata()], to generated synthetic datasets.
-#' @import parallel
+#' @importFrom parallel detectCores
+#' @importFrom future plan cluster
+#' @importFrom furrr future_map furrr_options
 #' @import dplyr
 #' @importFrom stats model.frame quantile
-#' @importFrom pbapply pblapply
 #' @examples
 #' mylogit <- function(formula, data){
 #' m <- structure(
@@ -208,10 +191,8 @@ estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,upper
       # use all cores in devtools::test()
       cl <- detectCores() -coreoffset
     }
-    cl <- makeCluster(cl)
   } else{
     cl <- 1L
-    cl <- makeCluster(cl)
   }
 
   plan(get(backend), workers = cl)  # Use chosen backend
@@ -223,10 +204,7 @@ estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,upper
     r <- acc_sim(n=x,method=method,p=p,dat=dat,model=model,eta=eta,nsample=nsample,outcome=outcome,power=power,effect_size=effect_size,powersims=powersims,alpha=alpha,split=split,cl=cl,predictfn=predictfn,...)
     return(r)
   }
-  results <- future_map_dbl(nvalues, temp,l=l,m=m,model=model,packages=packages,predictfn=predictfn,sparse=sparse,density=density,...,.options = furrr_options(seed = TRUE))
-
-  results <- suppressWarnings({pblapply(nvalues,acc_sim,)})
-  stopCluster(cl)
+  results <- future_map(nvalues, temp,method=method,p=p,dat=dat,model=model,eta=eta,nsample=nsample,outcome=outcome,power=power,effect_size=effect_size,powersims=powersims,alpha=alpha,split=split,cl=cl,predictfn=predictfn,...,.options = furrr_options(seed = TRUE))
   results <- bind_rows(results)
   summtable <- results %>% group_by(n) %>% summarise(Accuracy = mean(accuracy,na.rm=T),
                                                      Precision = mean(prec,na.rm=T),

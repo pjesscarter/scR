@@ -50,7 +50,7 @@ risk_bounds <- function(x, l, m, model,predictfn, sparse,density=NULL,...) {
       if (!is.null(fhat)) break  # Exit loop if model trains successfully
 
       gc()
-      if (attempt == 10) stop("Failed to train model after 100 attempts.")
+      if (attempt == 100) stop("Failed to train model after 100 attempts.")
     }
 
     # Predict and compute RW and RWprime
