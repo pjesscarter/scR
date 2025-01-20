@@ -29,6 +29,7 @@ estimate_accuracy(
   minn = ifelse(is.null(data), (dim + 1), (ncol(data) + 1)),
   x = NULL,
   y = NULL,
+  backend = c("multisession", "multicore", "cluster", "sequential"),
   ...
 )
 }
@@ -80,6 +81,8 @@ estimate_accuracy(
 \item{x}{Optional argument for methods that take separate predictor and outcome data. Specifies a matrix-like object containing predictors. Note that if used, the x and y objects are bound together columnwise; this must be handled in the user-supplied helper function.}
 
 \item{y}{Optional argument for methods that take separate predictor and outcome data. Specifies a vector-like object containing outcome values. Note that if used, the x and y objects are bound together columnwise; this must be handled in the user-supplied helper function.}
+
+\item{backend}{One of the parallel backends used by \code{\link[future:plan]{future::plan()}}. See function documentation for more details.}
 
 \item{...}{Additional arguments that need to be passed to \code{model}}
 }

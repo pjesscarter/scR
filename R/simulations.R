@@ -118,6 +118,7 @@ acc_sim <- function(n, method, p, dat, model, eta, nsample, outcome, power, effe
 #' @param minn Optional argument to set a different minimum n than the dimension of the algorithm. Useful with e.g. regularized regression models such as elastic net.
 #' @param x Optional argument for methods that take separate predictor and outcome data. Specifies a matrix-like object containing predictors. Note that if used, the x and y objects are bound together columnwise; this must be handled in the user-supplied helper function.
 #' @param y Optional argument for methods that take separate predictor and outcome data. Specifies a vector-like object containing outcome values. Note that if used, the x and y objects are bound together columnwise; this must be handled in the user-supplied helper function.
+#' @param backend One of the parallel backends used by [future::plan()]. See function documentation for more details.
 #' @param ... Additional arguments that need to be passed to `model`
 #' @return A `list` containing two named elements. `Raw` gives the exact output of the simulations, while `Summary` gives a table of accuracy metrics, including the achieved levels of \eqn{\epsilon} and \eqn{\delta} given the specified values. Alternative values can be calculated using [getpac()]
 #' @seealso [plot_accuracy()], to represent simulations visually, [getpac()], to calculate summaries for alternate values of \eqn{\epsilon} and \eqn{\delta} without conducting a new simulation, and [gendata()], to generated synthetic datasets.
@@ -155,9 +156,10 @@ acc_sim <- function(n, method, p, dat, model, eta, nsample, outcome, power, effe
 #' @export
 
 
-estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,upperlimit=NULL,nsample= 30, steps= 50,eta=0.05,delta=0.05,epsilon=0.05,predictfn = NULL,power = FALSE,effect_size=NULL,powersims=NULL,alpha=0.05,parallel = TRUE,coreoffset=0,packages=list(),method = c("Uniform","Class Imbalance"),p=NULL,minn = ifelse(is.null(data),(dim+1),(ncol(data)+1)),x=NULL,y=NULL,...){
+estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,upperlimit=NULL,nsample= 30, steps= 50,eta=0.05,delta=0.05,epsilon=0.05,predictfn = NULL,power = FALSE,effect_size=NULL,powersims=NULL,alpha=0.05,parallel = TRUE,coreoffset=0,packages=list(),method = c("Uniform","Class Imbalance"),p=NULL,minn = ifelse(is.null(data),(dim+1),(ncol(data)+1)),x=NULL,y=NULL,backend = c("multisession","multicore","cluster","sequential"),...){
   force(minn)
   split <- FALSE
+  backend <- match.arg(backend)
   if(is.null(data) & is.null(x)){
     names <- all.vars(formula)
     data <- gendata(model,dim,maxn,predictfn,names,...)
@@ -196,7 +198,7 @@ estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,upper
   }
 
   plan(get(backend), workers = cl)  # Use chosen backend
-  p <- progressor(steps = length(ngrid))
+  p <- progressor(steps = length(nvalues))
   temp <- function(x,method,p,dat,model,eta,nsample,outcome,power,effect_size,powersims,alpha,split,predictfn,...){
     p()
     #set.seed(as.numeric(Sys.time()))

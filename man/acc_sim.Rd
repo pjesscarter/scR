@@ -18,6 +18,7 @@ acc_sim(
   powersims,
   alpha,
   split,
+  predictfn,
   ...
 )
 }
@@ -47,6 +48,8 @@ acc_sim(
 \item{alpha}{If \code{power} is \code{TRUE}, a real number between 0 and 1 indicating the probability of Type I error to be used for hypothesis testing. Default is 0.05.}
 
 \item{split}{A logical indicating whether the data was passed as a single data frame or separately.}
+
+\item{predictfn}{An optional user-defined function giving a custom predict method. If also using a user-defined model, the \code{model} should output an object of class \code{"svrclass"} to avoid errors.}
 
 \item{...}{Additional model parameters to be specified by the user.}
 }
