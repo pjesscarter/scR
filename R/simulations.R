@@ -58,12 +58,21 @@ acc_sim <- function(n, method, p, dat, model, eta, nsample, outcome, power, effe
         samp <- samp[, !(names(samp) %in% outcome), drop = FALSE]
       } else {
         soc <- as.vector(samp[, ncol(samp)])
-        samp$outobs <- factor(ifelse(error, !as.numeric(soc), as.numeric(soc)), levels = c("0", "1"))
-        samp <- cbind(samp[, -ncol(samp), drop = FALSE], outobs = samp$outobs)
+        if(is.factor(soc)){
+          outobs <- factor(ifelse(error,!as.numeric(as.character(soc)),as.numeric(as.character(soc))),levels=c("0","1"))
+        } else{
+          outobs <- factor(ifelse(error,!soc,soc),levels=c("0","1"))
+        }
+        samp <- cbind(samp[, -ncol(samp), drop = FALSE], outobs)
       }
 
       m <- tryCatch(model(outobs ~ ., data = samp, ...),
-                    error = function(e) NULL)
+                    error = function(e) {
+                      warning("Failed to train model, regenerating data, see below error:")
+                      warning(e)
+                      return(NULL)
+                      }
+      )
 
       if (!is.null(m)) break
       gc()
@@ -83,7 +92,12 @@ acc_sim <- function(n, method, p, dat, model, eta, nsample, outcome, power, effe
       reject <- replicate(powersims, {
         Y <- effect_size * Dtrue + rnorm(length(Dobs))
         mdl <- lm(Y ~ Dobs)
-        summary(mdl)$coefficients[2, 4] < alpha
+        tryCatch(summary(mdl)$coefficients[2, 4] < alpha,
+                 error = function(e) {
+                   warning("Failed to generate experimental data, model might have predicted all observations of a single class")
+                   return(NA)
+                 }
+        )
       })
       pwr[j] <- mean(reject, na.rm = TRUE)
     }
@@ -198,15 +212,15 @@ estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,upper
   }
 
   plan(get(backend), workers = cl)  # Use chosen backend
-  p <- progressor(steps = length(nvalues))
+  progressor_p  <- progressor(steps = length(nvalues))
   temp <- function(x,method,p,dat,model,eta,nsample,outcome,power,effect_size,powersims,alpha,split,predictfn,...){
-    p()
+    progressor_p()
     #set.seed(as.numeric(Sys.time()))
     lapply(packages, library, character.only = TRUE)
-    r <- acc_sim(n=x,method=method,p=p,dat=dat,model=model,eta=eta,nsample=nsample,outcome=outcome,power=power,effect_size=effect_size,powersims=powersims,alpha=alpha,split=split,cl=cl,predictfn=predictfn,...)
+    r <- acc_sim(n=x,method=method,p=p,dat=dat,model=model,eta=eta,nsample=nsample,outcome=outcome,power=power,effect_size=effect_size,powersims=powersims,alpha=alpha,split=split,predictfn=predictfn,...)
     return(r)
   }
-  results <- future_map(nvalues, temp,method=method,p=p,dat=dat,model=model,eta=eta,nsample=nsample,outcome=outcome,power=power,effect_size=effect_size,powersims=powersims,alpha=alpha,split=split,cl=cl,predictfn=predictfn,...,.options = furrr_options(seed = TRUE))
+  results <- future_map(nvalues, temp,method=method,p=p,dat=dat,model=model,eta=eta,nsample=nsample,outcome=outcome,power=power,effect_size=effect_size,powersims=powersims,alpha=alpha,split=split,predictfn=predictfn,...,.options = furrr_options(seed = TRUE))
   results <- bind_rows(results)
   summtable <- results %>% group_by(n) %>% summarise(Accuracy = mean(accuracy,na.rm=T),
                                                      Precision = mean(prec,na.rm=T),
