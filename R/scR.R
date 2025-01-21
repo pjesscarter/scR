@@ -43,7 +43,7 @@ risk_bounds <- function(x, l, m, model,predictfn, sparse,density=NULL,...) {
 
       # Train model
       fhat <- tryCatch(
-        model(formula = y ~ ., data = cbind(y_train,x_train), ...
+        model(formula = y ~ ., data = cbind(x_train,y_train), ...
               ),
         error = function(e) NULL
       )

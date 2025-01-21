@@ -81,14 +81,14 @@ acc_sim <- function(n, method, p, dat, model, eta, nsample, outcome, power, effe
 
     foc <- factor(oc, levels = c("0", "1"))
     pred <- suppressWarnings(predict(m, dat[, -ncol(dat), drop = FALSE]))
-    accuracy[j] <- mean(as.numeric(pred == foc))
+    accuracy[j] <- mean(pred == foc)
     prec[j] <- tryCatch(precision(table(pred, foc), relevant = 1), error = function(e) NA)
     rec[j] <- tryCatch(recall(table(pred, foc), relevant = 1), error = function(e) NA)
     fscore[j] <- tryCatch(F_meas(table(pred, foc), relevant = 1), error = function(e) NA)
 
     if (power) {
       Dobs <- as.numeric(levels(pred)[pred])
-      Dtrue <- as.numeric(oc)
+      Dtrue <- if(is.factor(oc)) as.numeric(levels(oc)[oc]) else oc
       reject <- replicate(powersims, {
         Y <- effect_size * Dtrue + rnorm(length(Dobs))
         mdl <- lm(Y ~ Dobs)
