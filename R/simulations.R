@@ -54,16 +54,15 @@ acc_sim <- function(n, method, p, dat, model, eta, nsample, outcome, power, effe
 
       if (!split) {
         soc <- samp[[outcome]]
-        samp$outobs <- factor(ifelse(error, !as.numeric(soc), as.numeric(soc)), levels = c("0", "1"))
+        if(is.factor(soc)){
+          samp$outobs <- factor(ifelse(error, !as.numeric(as.character(soc)), as.numeric(as.character(soc))), levels = c("0", "1"))
+        } else{
+          samp$outobs <- factor(ifelse(error, (1-soc), soc)), levels = c("0", "1"))
+        }
         samp <- samp[, !(names(samp) %in% outcome), drop = FALSE]
       } else {
         soc <- as.vector(samp[, ncol(samp)])
-        if(is.factor(soc)){
-          outobs <- factor(ifelse(error,!as.numeric(as.character(soc)),as.numeric(as.character(soc))),levels=c("0","1"))
-        } else{
-          outobs <- factor(ifelse(error,!soc,soc),levels=c("0","1"))
-        }
-        samp <- cbind(samp[, -ncol(samp), drop = FALSE], outobs)
+        samp <- cbind(samp[, -ncol(samp), drop = FALSE], as.numeric(ifelse(error,!soc,soc)))
       }
 
       m <- tryCatch(model(outobs ~ ., data = samp, ...),
@@ -181,6 +180,12 @@ estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,upper
   } else if(!is.null(x)){
     if(is.null(y)){
       simpleError("Predictor matrix specified but no outcome given")
+    } else if(is.factor(y)){
+      if(length(levels(y))!=2){
+        simpleError(paste("Expected binary outcome vector but got number of levels:", length(levels(y))))
+      } else{
+        y <- ifelse(as.numeric(y)==1,0,1)
+      }
     }
     data <- cbind(x,y)
     split <- TRUE
