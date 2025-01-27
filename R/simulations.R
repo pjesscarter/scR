@@ -57,7 +57,7 @@ acc_sim <- function(n, method, p, dat, model, eta, nsample, outcome, power, effe
         if(is.factor(soc)){
           samp$outobs <- factor(ifelse(error, !as.numeric(as.character(soc)), as.numeric(as.character(soc))), levels = c("0", "1"))
         } else{
-          samp$outobs <- factor(ifelse(error, (1-soc), soc)), levels = c("0", "1"))
+          samp$outobs <- factor(ifelse(error, (1-soc), soc), levels = c("0", "1"))
         }
         samp <- samp[, !(names(samp) %in% outcome), drop = FALSE]
       } else {
