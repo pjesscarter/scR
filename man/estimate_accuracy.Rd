@@ -10,6 +10,8 @@ estimate_accuracy(
   data = NULL,
   dim = NULL,
   maxn = NULL,
+  sparse = FALSE,
+  density = NULL,
   upperlimit = NULL,
   nsample = 30,
   steps = 50,
@@ -43,6 +45,10 @@ estimate_accuracy(
 \item{dim}{Required if \code{data} is unspecified. Gives the horizontal dimension of the data (number of predictor variables) to be generated.}
 
 \item{maxn}{Required if \code{data} is unspecified. Gives the vertical dimension of the data (number of observations) to be generated.}
+
+\item{sparse}{Optional. A logical giving whether to generate sparse data, if data was not given.}
+
+\item{density}{Real number between 0 and 1 giving the proportion of non 0 entries in the sparse matrix. Used only if sparse is TRUE.}
 
 \item{upperlimit}{Optional. A positive integer giving the maximum sample size to be simulated, if data was supplied.}
 

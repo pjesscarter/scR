@@ -5,10 +5,13 @@
 #' @param maxn Gives the vertical dimension of the data (number of observations) to be generated.
 #' @param predictfn An optional user-defined function giving a custom predict method. If also using a user-defined model, the `model` should output an object of class `"svrclass"` to avoid errors.
 #' @param varnames An optional character vector giving the names of variables to be used for the generated data
+#' @param sparse Logical indicating whether sparse matrix generation should be used to save on memory. Defaults to false for better accuracy.
+#' @param density Real number between 0 and 1 giving the proportion of non 0 entries in the sparse matrix. Used only if sparse is TRUE.
 #' @param ... Additional arguments that need to be passed to `model`
 #' @return A `data.frame` containing the simulated data.
 #' @seealso [estimate_accuracy()], to estimate sample complexity bounds given the generated data
 #' @importFrom stats runif predict
+#' @importFrom Matrix rsparsematrix
 #' @examples
 #' mylogit <- function(formula, data){
 #' m <- structure(
@@ -37,17 +40,32 @@
 #' }
 #' @export
 
-gendata <- function(model,dim,maxn,predictfn=NULL,varnames=NULL, ...){
+gendata <- function(model,dim,maxn,predictfn=NULL,varnames=NULL, sparse=FALSE, density=NULL,...){
   if(!is.null(predictfn)){
     predict.svrclass <- predictfn
   }
-  dat <- matrix(runif((dim*maxn),-100,100),nrow=maxn)
-  coefs <- runif(dim,0,1)
-  y <- dat %*% coefs #TODO - support nonlinear boundaries
-  dat <- data.frame(y=as.numeric(y>0),dat)
-  m <- model(y~.,dat,...)
-  outpred <- suppressWarnings(predict(m,dat[,2:(dim+1)]))
-  dat$y <- outpred
-  colnames(dat) <- varnames
+  if(sparse){
+    x <- rsparsematrix(nrow = 2 * maxn, ncol = dim,density=density)
+    coeff <- rnorm(dim)
+    y <- as.numeric(((x %*% coeff) > 0))
+    dat <- cbind(x,y)
+    m <- model(y~.,dat,...)
+    outpred <- as.numeric(as.character(suppressWarnings(predict(m,x))))
+    dat <- cbind(x,outpred)
+    if(length(varnames) == ncol(dat)){
+      colnames(dat) <- varnames
+    }
+  } else{
+    dat <- matrix(runif((dim*maxn),-100,100),nrow=maxn)
+    coefs <- rnorm(dim)
+    y <- dat %*% coefs #TODO - support nonlinear boundaries
+    dat <- data.frame(y=as.numeric(y>0),dat)
+    m <- model(y~.,dat,...)
+    outpred <- suppressWarnings(predict(m,dat[,2:(dim+1)]))
+    dat$y <- outpred
+    if(length(varnames) == ncol(dat)){
+      colnames(dat) <- varnames
+    }
+  }
   return(dat)
 }

@@ -4,7 +4,16 @@
 \alias{gendata}
 \title{Simulate data with appropriate structure to be used in estimating sample complexity bounds}
 \usage{
-gendata(model, dim, maxn, predictfn = NULL, varnames = NULL, ...)
+gendata(
+  model,
+  dim,
+  maxn,
+  predictfn = NULL,
+  varnames = NULL,
+  sparse = FALSE,
+  density = NULL,
+  ...
+)
 }
 \arguments{
 \item{model}{A binary classification model supplied by the user. Must take arguments \code{formula} and \code{data}}
@@ -16,6 +25,10 @@ gendata(model, dim, maxn, predictfn = NULL, varnames = NULL, ...)
 \item{predictfn}{An optional user-defined function giving a custom predict method. If also using a user-defined model, the \code{model} should output an object of class \code{"svrclass"} to avoid errors.}
 
 \item{varnames}{An optional character vector giving the names of variables to be used for the generated data}
+
+\item{sparse}{Logical indicating whether sparse matrix generation should be used to save on memory. Defaults to false for better accuracy.}
+
+\item{density}{Real number between 0 and 1 giving the proportion of non 0 entries in the sparse matrix. Used only if sparse is TRUE.}
 
 \item{...}{Additional arguments that need to be passed to \code{model}}
 }

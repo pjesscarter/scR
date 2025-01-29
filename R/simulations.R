@@ -112,6 +112,8 @@ acc_sim <- function(n, method, p, dat, model, eta, nsample, outcome, power, effe
 #' @param data Optional. A rectangular `data.frame` object giving the full data from which samples are to be drawn. If left unspecified, [gendata()] is called to produce synthetic data with an appropriate structure.
 #' @param dim Required if `data` is unspecified. Gives the horizontal dimension of the data (number of predictor variables) to be generated.
 #' @param maxn Required if `data` is unspecified. Gives the vertical dimension of the data (number of observations) to be generated.
+#' @param sparse Optional. A logical giving whether to generate sparse data, if data was not given.
+#' @param density Real number between 0 and 1 giving the proportion of non 0 entries in the sparse matrix. Used only if sparse is TRUE.
 #' @param upperlimit Optional. A positive integer giving the maximum sample size to be simulated, if data was supplied.
 #' @param nsample A positive integer giving the number of samples to be generated for each value of $n$. Larger values give more accurate results.
 #' @param steps A positive integer giving the interval of values of $n$ for which simulations should be conducted. Larger values give more accurate results.
@@ -169,14 +171,19 @@ acc_sim <- function(n, method, p, dat, model, eta, nsample, outcome, power, effe
 #' @export
 
 
-estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,upperlimit=NULL,nsample= 30, steps= 50,eta=0.05,delta=0.05,epsilon=0.05,predictfn = NULL,power = FALSE,effect_size=NULL,powersims=NULL,alpha=0.05,parallel = TRUE,coreoffset=0,packages=list(),method = c("Uniform","Class Imbalance"),p=NULL,minn = ifelse(is.null(data),(dim+1),(ncol(data)+1)),x=NULL,y=NULL,backend = c("multisession","multicore","cluster","sequential"),...){
+estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,sparse=FALSE,density=NULL,upperlimit=NULL,nsample= 30, steps= 50,eta=0.05,delta=0.05,epsilon=0.05,predictfn = NULL,power = FALSE,effect_size=NULL,powersims=NULL,alpha=0.05,parallel = TRUE,coreoffset=0,packages=list(),method = c("Uniform","Class Imbalance"),p=NULL,minn = ifelse(is.null(data),(dim+1),(ncol(data)+1)),x=NULL,y=NULL,backend = c("multisession","multicore","cluster","sequential"),...){
   force(minn)
   split <- FALSE
   backend <- match.arg(backend)
   if(is.null(data) & is.null(x)){
     names <- all.vars(formula)
-    data <- gendata(model,dim,maxn,predictfn,names,...)
-    dat <- model.frame(formula,data)
+    data <- gendata(model,dim,maxn,predictfn,names,sparse,density,...)
+    if(sparse){
+      split <- TRUE
+      dat <- data
+    } else{
+      dat <- model.frame(formula,data)
+    }
   } else if(!is.null(x)){
     if(is.null(y)){
       simpleError("Predictor matrix specified but no outcome given")
