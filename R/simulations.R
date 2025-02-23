@@ -176,6 +176,9 @@ estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,spars
   split <- FALSE
   backend <- match.arg(backend)
   if(is.null(data) & is.null(x)){
+    if(is.null(dim)){
+      simpleError("No data provided but no dimension given for data simulation")
+    }
     names <- all.vars(formula)
     data <- gendata(model,dim,maxn,predictfn,names,sparse,density,...)
     if(sparse){
