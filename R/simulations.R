@@ -225,8 +225,12 @@ estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,spars
   } else{
     cl <- 1L
   }
+  if(backend == "sequential"){
+    plan(get(backend))
+  } else{
+    plan(get(backend), workers = cl)  # Use chosen backend
+  }
 
-  plan(get(backend), workers = cl)  # Use chosen backend
   progressor_p  <- progressor(steps = length(nvalues))
   temp <- function(x,method,p,dat,model,eta,nsample,outcome,power,effect_size,powersims,alpha,split,predictfn,...){
     progressor_p()
