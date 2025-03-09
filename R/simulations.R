@@ -224,6 +224,9 @@ estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,spars
     }
   } else{
     cl <- 1L
+    if(backend != "sequential"){
+      stop("Parallel set to false but parallel backend has been given. Please set backend to 'sequential'")
+    }
   }
   if(backend == "sequential"){
     plan(get(backend))
