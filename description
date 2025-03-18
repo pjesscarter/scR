@@ -1,6 +1,6 @@
 Package: scR
 Title: Estimate Vapnik-Chervonenkis Dimension and Sample Complexity 
-Version: 0.5.0
+Version: 0.6.0
 Authors@R:
     c(person("Perry", "Carter", , "pjc504@nyu.edu", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-4684-6533")),
