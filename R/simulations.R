@@ -230,7 +230,7 @@ estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,spars
   }
   if(backend == "sequential"){
     plan(get(backend))
-  } else if(backend== "cluster"{
+  } else if(backend== "cluster"){
     cl <- makeClusterPSOCK(availableWorkers(), revtunnel = FALSE)
     plan(get(backend), workers = cl)
   } else{
