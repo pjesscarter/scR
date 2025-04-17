@@ -79,7 +79,12 @@ acc_sim <- function(n, method, p, dat, model, eta, nsample, outcome, power, effe
     }
 
     foc <- factor(oc, levels = c("0", "1"))
-    pred <- suppressWarnings(predict(m, dat[, -ncol(dat), drop = FALSE]))
+    if(split){
+      pred <- suppressWarnings(predict(m, dat[, -ncol(dat), drop = FALSE]))
+    } else{
+      pred <- suppressWarnings(predict(m, dat[,-which(names(dat)==outcome), drop = FALSE]))
+    }
+
     accuracy[j] <- mean(pred == foc)
     prec[j] <- tryCatch(precision(table(pred, foc), relevant = 1), error = function(e) NA)
     rec[j] <- tryCatch(recall(table(pred, foc), relevant = 1), error = function(e) NA)
