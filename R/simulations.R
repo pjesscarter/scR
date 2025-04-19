@@ -171,7 +171,7 @@ acc_sim <- function(n, method, p, dat, model, eta, nsample, outcome, power, effe
 #' @export
 
 
-estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,sparse=FALSE,density=NULL,upperlimit=NULL,nsample= 30, steps= 50,eta=0.05,delta=0.05,epsilon=0.05,predictfn = NULL,power = FALSE,effect_size=NULL,powersims=NULL,alpha=0.05,parallel = TRUE,coreoffset=0,packages=list(),method = c("Uniform","Class Imbalance"),p=NULL,minn = ifelse(is.null(data),(dim+1),(ncol(data)+1)),x=NULL,y=NULL,backend = c("multisession","multicore","cluster","sequential"),...){
+estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,sparse=FALSE,density=NULL,upperlimit=NULL,nsample= 30, steps= 50,eta=0.05,delta=0.05,epsilon=0.05,predictfn = NULL,power = FALSE,effect_size=NULL,powersims=NULL,alpha=0.05,parallel = TRUE,coreoffset=0,packages=list(),method = c("Uniform","Class Imbalance"),p=NULL,minn = ifelse(is.null(data),ifelse(is.null(x),(dim+1),(ncol(x)+1)),(ncol(data)+1)),x=NULL,y=NULL,backend = c("multisession","multicore","cluster","sequential"),...){
   force(minn)
   split <- FALSE
   backend <- match.arg(backend)
@@ -230,7 +230,7 @@ estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,spars
   }
   if(backend == "sequential"){
     plan(get(backend))
-  } else if(backend== "cluster"){
+  } else if(backend== "cluster"{
     cl <- makeClusterPSOCK(availableWorkers(), revtunnel = FALSE)
     plan(get(backend), workers = cl)
   } else{
