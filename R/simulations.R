@@ -14,13 +14,14 @@
 #' @param alpha If `power` is `TRUE`, a real number between 0 and 1 indicating the probability of Type I error to be used for hypothesis testing. Default is 0.05.
 #' @param split A logical indicating whether the data was passed as a single data frame or separately.
 #' @param predictfn An optional user-defined function giving a custom predict method. If also using a user-defined model, the `model` should output an object of class `"svrclass"` to avoid errors.
+#' @param replacement A logical flag indicating whether sampling should be performed with replacement.
 #' @param ... Additional model parameters to be specified by the user.
 #' @return A data frame giving performance metrics for the specified sample size.
 #' @importFrom caret precision recall F_meas
 #' @importFrom stats rbinom predict rnorm lm
 #' @import dplyr
 #' @export
-acc_sim <- function(n, method, p, dat, model, eta, nsample, outcome, power, effect_size, powersims, alpha, split, predictfn, ...) {
+acc_sim <- function(n, method, p, dat, model, eta, nsample, outcome, power, effect_size, powersims, alpha, split, predictfn, replacement,...) {
   if (!is.null(predictfn)) {
     predict.svrclass <- predictfn
   }
@@ -36,18 +37,18 @@ acc_sim <- function(n, method, p, dat, model, eta, nsample, outcome, power, effe
   for (j in seq_len(nsample)) {
     for (attempt in 1:100) {
       if (method == "Uniform") {
-        indices <- sample(seq_len(nrow(dat)), n)
+        indices <- sample(seq_len(nrow(dat)), n,replace = replacement)
         samp <- dat[indices, , drop = FALSE]
         error <- rbinom(n, 1, eta)
       } else if (method == "Class Imbalance") {
         if (is.null(p)) stop("Class Imbalance method selected. Please supply a class imbalance parameter.")
         probs <- ifelse(oc == 1, p, 1 - p)
-        indices <- sample(seq_len(nrow(dat)), n, prob = probs)
+        indices <- sample(seq_len(nrow(dat)), n, prob = probs,replace = replacement)
         samp <- dat[indices, , drop = FALSE]
         error <- rbinom(n, 1, eta)
       } else {
         probs <- method(dat)
-        indices <- sample(seq_len(nrow(dat)), n, prob = probs)
+        indices <- sample(seq_len(nrow(dat)), n, prob = probs,replace = replacement)
         samp <- dat[indices, , drop = FALSE]
         error <- rbinom(n, 1, eta)
       }
@@ -139,6 +140,7 @@ acc_sim <- function(n, method, p, dat, model, eta, nsample, outcome, power, effe
 #' @param x Optional argument for methods that take separate predictor and outcome data. Specifies a matrix-like object containing predictors. Note that if used, the x and y objects are bound together columnwise; this must be handled in the user-supplied helper function.
 #' @param y Optional argument for methods that take separate predictor and outcome data. Specifies a vector-like object containing outcome values. Note that if used, the x and y objects are bound together columnwise; this must be handled in the user-supplied helper function.
 #' @param backend One of the parallel backends used by [future::plan()]. See function documentation for more details.
+#' @param replacement A logical flag indicating whether sampling should be performed with replacement.
 #' @param ... Additional arguments that need to be passed to `model`
 #' @return A `list` containing two named elements. `Raw` gives the exact output of the simulations, while `Summary` gives a table of accuracy metrics, including the achieved levels of \eqn{\epsilon} and \eqn{\delta} given the specified values. Alternative values can be calculated using [getpac()]
 #' @seealso [plot_accuracy()], to represent simulations visually, [getpac()], to calculate summaries for alternate values of \eqn{\epsilon} and \eqn{\delta} without conducting a new simulation, and [gendata()], to generated synthetic datasets.
@@ -176,7 +178,7 @@ acc_sim <- function(n, method, p, dat, model, eta, nsample, outcome, power, effe
 #' @export
 
 
-estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,sparse=FALSE,density=NULL,upperlimit=NULL,nsample= 30, steps= 50,eta=0.05,delta=0.05,epsilon=0.05,predictfn = NULL,power = FALSE,effect_size=NULL,powersims=NULL,alpha=0.05,parallel = TRUE,coreoffset=0,packages=list(),method = c("Uniform","Class Imbalance"),p=NULL,minn = ifelse(is.null(data),ifelse(is.null(x),(dim+1),(ncol(x)+1)),(ncol(data)+1)),x=NULL,y=NULL,backend = c("multisession","multicore","cluster","sequential"),...){
+estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,sparse=FALSE,density=NULL,upperlimit=NULL,nsample= 30, steps= 50,eta=0.05,delta=0.05,epsilon=0.05,predictfn = NULL,power = FALSE,effect_size=NULL,powersims=NULL,alpha=0.05,parallel = TRUE,coreoffset=0,packages=list(),method = c("Uniform","Class Imbalance"),p=NULL,minn = ifelse(is.null(data),ifelse(is.null(x),(dim+1),(ncol(x)+1)),(ncol(data)+1)),x=NULL,y=NULL,backend = c("multisession","multicore","cluster","sequential"),replacement=TRUE,...){
   force(minn)
   split <- FALSE
   backend <- match.arg(backend)
@@ -243,14 +245,14 @@ estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,spars
   }
 
   progressor_p  <- progressor(steps = length(nvalues))
-  temp <- function(x,method,p,dat,model,eta,nsample,outcome,power,effect_size,powersims,alpha,split,predictfn,...){
+  temp <- function(x,method,p,dat,model,eta,nsample,outcome,power,effect_size,powersims,alpha,split,predictfn,replacement,...){
     progressor_p()
     #set.seed(as.numeric(Sys.time()))
     lapply(packages, library, character.only = TRUE)
-    r <- acc_sim(n=x,method=method,p=p,dat=dat,model=model,eta=eta,nsample=nsample,outcome=outcome,power=power,effect_size=effect_size,powersims=powersims,alpha=alpha,split=split,predictfn=predictfn,...)
+    r <- acc_sim(n=x,method=method,p=p,dat=dat,model=model,eta=eta,nsample=nsample,outcome=outcome,power=power,effect_size=effect_size,powersims=powersims,alpha=alpha,split=split,predictfn=predictfn,replacement=replacement,...)
     return(r)
   }
-  results <- future_map(nvalues, temp,method=method,p=p,dat=dat,model=model,eta=eta,nsample=nsample,outcome=outcome,power=power,effect_size=effect_size,powersims=powersims,alpha=alpha,split=split,predictfn=predictfn,...,.options = furrr_options(seed = TRUE))
+  results <- future_map(nvalues, temp,method=method,p=p,dat=dat,model=model,eta=eta,nsample=nsample,outcome=outcome,power=power,effect_size=effect_size,powersims=powersims,alpha=alpha,split=split,predictfn=predictfn,replacement=replacement,...,.options = furrr_options(seed = TRUE))
   results <- bind_rows(results)
   summtable <- results %>% group_by(n) %>% summarise(Accuracy = mean(accuracy,na.rm=T),
                                                      Precision = mean(prec,na.rm=T),
