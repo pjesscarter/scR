@@ -1,3 +1,5 @@
+#' Fit an extrapolation model using nonlinear least squares
+#'
 #' Utility function to fit extrapolation model, for use with [conduct_interpolation()]
 #'
 #' @param formula A formula object giving the model to be fit.
@@ -32,7 +34,8 @@ fit_and_predict <- function(formula, data, N_grid, maxN_obs, start = NULL, lower
   })
 }
 
-
+#' Conduct interpolation on a single simulation
+#'
 #' Wrapper function for fitting extrapolation model to a single object of class "scb_data". Allows fitting of custom functions, but for general use interpolate_scb should be used instead.
 #'
 #' @param scbobject An object of class "scb_data" for interpolation to be conducted on.
@@ -97,6 +100,8 @@ conduct_interpolation <- function(
   return(out)
 }
 
+#' Conduct interpolation on a list of data
+#'
 #' Wrapper function for fitting extrapolation model to a single object of class "scb_data". Allows fitting of custom functions, but for general use interpolate_scb should be used instead.
 #'
 #' @param scbobject An object of class "scb_data" for interpolation to be conducted on.
@@ -112,7 +117,7 @@ conduct_interpolation <- function(
 #' @param delta_start A positive integer giving value of the largest N in the observed data.
 #' @param epsilon_start Optional named vector of starting values for the model parameters.
 #' @return A named `list` containing the interpolated dataframe, the original input data frame, and the given values of epsilon, delta, and maxN.
-#' @seealso [interpolate_scb()] is the main wrapper for interpolation on a list.
+#' @seealso [conduct_interpolation()] can be used to fit custom curves or single simulations without confidence intervals.
 #' @export
 #' @importFrom pbapply pblapply
 interpolate_scb <- function(data_list,
@@ -391,7 +396,8 @@ print.summary_empirical_scb_list <- function(x, ...) {
 }
 
 
-
+#' Create custom model fitting function
+#'
 #' Utility function for creating custom classification function for use in SCB calculations.
 #'
 #' @param model_fun A binary classification model supplied by the user, e.g. glm
@@ -452,7 +458,8 @@ create_scb_model <- function(model_fun,
   }
 }
 
-
+#' Create custom prediction function
+#'
 #' Utility function for creating custom prediction function for use in SCB calculations.
 #'
 #' @param predict_fun A binary prediction model supplied by the user, e.g. predict.glm

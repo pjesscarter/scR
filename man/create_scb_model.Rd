@@ -2,7 +2,7 @@
 % Please edit documentation in R/scR.R
 \name{create_scb_model}
 \alias{create_scb_model}
-\title{Utility function for creating custom classification function for use in SCB calculations.}
+\title{Create custom model fitting function}
 \usage{
 create_scb_model(
   model_fun,

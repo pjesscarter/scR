@@ -2,7 +2,7 @@
 % Please edit documentation in R/scR.R
 \name{conduct_interpolation}
 \alias{conduct_interpolation}
-\title{Wrapper function for fitting extrapolation model to a single object of class "scb_data". Allows fitting of custom functions, but for general use interpolate_scb should be used instead.}
+\title{Conduct interpolation on a single simulation}
 \usage{
 conduct_interpolation(
   scbobject,

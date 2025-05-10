@@ -2,7 +2,7 @@
 % Please edit documentation in R/scR.R
 \name{fit_and_predict}
 \alias{fit_and_predict}
-\title{Utility function to fit extrapolation model, for use with \code{\link[=conduct_interpolation]{conduct_interpolation()}}}
+\title{Fit an extrapolation model using nonlinear least squares}
 \usage{
 fit_and_predict(
   formula,

@@ -2,7 +2,7 @@
 % Please edit documentation in R/scR.R
 \name{interpolate_scb}
 \alias{interpolate_scb}
-\title{Wrapper function for fitting extrapolation model to a single object of class "scb_data". Allows fitting of custom functions, but for general use interpolate_scb should be used instead.}
+\title{Conduct interpolation on a list of data}
 \usage{
 interpolate_scb(
   data_list,
@@ -51,5 +51,5 @@ A named \code{list} containing the interpolated dataframe, the original input da
 Wrapper function for fitting extrapolation model to a single object of class "scb_data". Allows fitting of custom functions, but for general use interpolate_scb should be used instead.
 }
 \seealso{
-\code{\link[=interpolate_scb]{interpolate_scb()}} is the main wrapper for interpolation on a list.
+\code{\link[=conduct_interpolation]{conduct_interpolation()}} can be used to fit custom curves or single simulations without confidence intervals.
 }

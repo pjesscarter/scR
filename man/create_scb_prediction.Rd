@@ -2,7 +2,7 @@
 % Please edit documentation in R/scR.R
 \name{create_scb_prediction}
 \alias{create_scb_prediction}
-\title{Utility function for creating custom prediction function for use in SCB calculations.}
+\title{Create custom prediction function}
 \usage{
 create_scb_prediction(
   predict_fun,
