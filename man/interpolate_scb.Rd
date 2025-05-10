@@ -20,6 +20,10 @@ interpolate_scb(
 )
 }
 \arguments{
+\item{delta_interp_fun}{The interpolation/extrapolation function to be used for the delta curve. Defaults to standard logistic, but 4 and 5 parameter as well as declining logistic functions are also supported.}
+
+\item{epsilon_interp_fun}{The interpolation/extrapolation function to be used for the epsilon curve. Defaults to gompertz, but exponential-plateau, weibull, and quadratic plateau functions are also supported.}
+
 \item{epsilon}{A real number between 0 and 1 giving the targeted maximum out-of-sample (OOS) error rate}
 
 \item{delta}{A real number between 0 and 1 giving the targeted maximum probability of observing an OOS error rate higher than \code{epsilon}}
@@ -38,7 +42,7 @@ interpolate_scb(
 
 \item{epsilon_start}{Optional named vector of starting values for the model parameters.}
 
-\item{scbobject}{An object of class "scb_data" for interpolation to be conducted on.}
+\item{scbobject}{A list of objects of class "scb_data" for interpolation to be conducted on.}
 
 \item{delta_formula}{Formula of the form Delta ~ model(n,...) giving the NLS model to be applied to the delta curve.}
 
@@ -48,7 +52,7 @@ interpolate_scb(
 A named \code{list} containing the interpolated dataframe, the original input data frame, and the given values of epsilon, delta, and maxN.
 }
 \description{
-Wrapper function for fitting extrapolation model to a single object of class "scb_data". Allows fitting of custom functions, but for general use interpolate_scb should be used instead.
+Wrapper function for fitting extrapolation model to a list of objects of class "scb_data" using nonlinear least squares.
 }
 \seealso{
 \code{\link[=conduct_interpolation]{conduct_interpolation()}} can be used to fit custom curves or single simulations without confidence intervals.

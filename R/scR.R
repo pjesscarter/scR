@@ -102,9 +102,10 @@ conduct_interpolation <- function(
 
 #' Conduct interpolation on a list of data
 #'
-#' Wrapper function for fitting extrapolation model to a single object of class "scb_data". Allows fitting of custom functions, but for general use interpolate_scb should be used instead.
-#'
-#' @param scbobject An object of class "scb_data" for interpolation to be conducted on.
+#' Wrapper function for fitting extrapolation model to a list of objects of class "scb_data" using nonlinear least squares.
+#' @param scbobject A list of objects of class "scb_data" for interpolation to be conducted on.
+#' @param delta_interp_fun The interpolation/extrapolation function to be used for the delta curve. Defaults to standard logistic, but 4 and 5 parameter as well as declining logistic functions are also supported.
+#' @param epsilon_interp_fun The interpolation/extrapolation function to be used for the epsilon curve. Defaults to gompertz, but exponential-plateau, weibull, and quadratic plateau functions are also supported.
 #' @param epsilon A real number between 0 and 1 giving the targeted maximum out-of-sample (OOS) error rate
 #' @param delta A real number between 0 and 1 giving the targeted maximum probability of observing an OOS error rate higher than `epsilon`
 #' @param maxN A positive integer giving value of the largest N for which extrapolation is to be conducted.
