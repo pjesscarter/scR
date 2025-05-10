@@ -19,6 +19,8 @@ estimate_accuracy(
   delta = 0.05,
   epsilon = 0.05,
   predictfn = NULL,
+  subsample_size = NULL,
+  nboot = 1L,
   power = FALSE,
   effect_size = NULL,
   powersims = NULL,
@@ -28,10 +30,12 @@ estimate_accuracy(
   packages = list(),
   method = c("Uniform", "Class Imbalance"),
   p = NULL,
-  minn = ifelse(is.null(data), (dim + 1), (ncol(data) + 1)),
+  minn = ifelse(is.null(data), ifelse(is.null(x), (dim + 1), (ncol(x) + 1)), (ncol(data)
+    + 1)),
   x = NULL,
   y = NULL,
   backend = c("multisession", "multicore", "cluster", "sequential"),
+  replacement = TRUE,
   ...
 )
 }
@@ -64,6 +68,10 @@ estimate_accuracy(
 
 \item{predictfn}{An optional user-defined function giving a custom predict method. If also using a user-defined model, the \code{model} should output an object of class \code{"svrclass"} to avoid errors.}
 
+\item{subsample_size}{An integer giving the size of the initial 'pilot' sample to be simulated. If left as NULL, the input data size will be used (benchmark SCB).}
+
+\item{nboot}{An integer giving the number of SCB bootstraps to be performed.}
+
 \item{power}{A logical indicating whether experimental power based on the predictions should also be reported}
 
 \item{effect_size}{If \code{power} is \code{TRUE}, a real number indicating the scaled effect size the user would like to be able to detect.}
@@ -90,6 +98,8 @@ estimate_accuracy(
 
 \item{backend}{One of the parallel backends used by \code{\link[future:plan]{future::plan()}}. See function documentation for more details.}
 
+\item{replacement}{A logical flag indicating whether sampling should be performed with replacement.function.}
+
 \item{...}{Additional arguments that need to be passed to \code{model}}
 }
 \value{
@@ -114,15 +124,6 @@ out <- factor(ifelse(out>0.5,1,0),levels=c("0","1"))
 return(out)
 }
 \donttest{
-library(parallel)
-  results <- estimate_accuracy(two_year_recid ~
-    race + sex + age + juv_fel_count + juv_misd_count + priors_count +
-    charge_degree..misd.fel.,mylogit,br,
-    predictfn = mypred,
-    nsample=10,
-    steps=1000,
-    coreoffset = (detectCores() -2)
-  )
 }
 }
 \seealso{

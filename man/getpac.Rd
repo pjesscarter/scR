@@ -35,15 +35,6 @@ out <- factor(ifelse(out>0.5,1,0),levels=c("0","1"))
 return(out)
 }
 \donttest{
-library(parallel)
-results <- estimate_accuracy(two_year_recid ~ race +
-    sex + age + juv_fel_count + juv_misd_count + priors_count +
-    charge_degree..misd.fel.,mylogit,br,predictfn = mypred,
-    nsample=10,
-    steps=1000,
-    coreoffset = (detectCores() -2))
-resultsalt <- getpac(results,epsilon=0.5,delta=0.3)
-print(resultsalt$Summary)
 }
 }
 \seealso{

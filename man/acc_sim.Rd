@@ -19,6 +19,7 @@ acc_sim(
   alpha,
   split,
   predictfn,
+  replacement,
   ...
 )
 }
@@ -50,6 +51,8 @@ acc_sim(
 \item{split}{A logical indicating whether the data was passed as a single data frame or separately.}
 
 \item{predictfn}{An optional user-defined function giving a custom predict method. If also using a user-defined model, the \code{model} should output an object of class \code{"svrclass"} to avoid errors.}
+
+\item{replacement}{A logical flag indicating whether sampling should be performed with replacement.}
 
 \item{...}{Additional model parameters to be specified by the user.}
 }

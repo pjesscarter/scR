@@ -38,7 +38,7 @@ fit_and_predict <- function(formula, data, N_grid, maxN_obs, start = NULL, lower
 #' @param scbobject An object of class "scb_data" for interpolation to be conducted on.
 #' @param epsilon A real number between 0 and 1 giving the targeted maximum out-of-sample (OOS) error rate
 #' @param delta A real number between 0 and 1 giving the targeted maximum probability of observing an OOS error rate higher than `epsilon`
-#' @param maxN A positive integer giving value of the largest N in the observed data.
+#' @param maxN A positive integer giving value of the largest N for which extrapolation is to be conducted.
 #' @param delta_formula Formula of the form Delta ~ model(n,...) giving the NLS model to be applied to the delta curve.
 #' @param epsilon_formula Formula of the form Epsilon ~ model(n,...) giving the NLS model to be applied to the epsilon curve.
 #' @param delta_lower_bounds Optional named vector of upper bounds for the model parameters.
@@ -102,7 +102,7 @@ conduct_interpolation <- function(
 #' @param scbobject An object of class "scb_data" for interpolation to be conducted on.
 #' @param epsilon A real number between 0 and 1 giving the targeted maximum out-of-sample (OOS) error rate
 #' @param delta A real number between 0 and 1 giving the targeted maximum probability of observing an OOS error rate higher than `epsilon`
-#' @param maxN A positive integer giving value of the largest N in the observed data.
+#' @param maxN A positive integer giving value of the largest N for which extrapolation is to be conducted.
 #' @param delta_formula Formula of the form Delta ~ model(n,...) giving the NLS model to be applied to the delta curve.
 #' @param epsilon_formula Formula of the form Epsilon ~ model(n,...) giving the NLS model to be applied to the epsilon curve.
 #' @param delta_lower_bounds Optional named vector of upper bounds for the model parameters.
@@ -114,6 +114,7 @@ conduct_interpolation <- function(
 #' @return A named `list` containing the interpolated dataframe, the original input data frame, and the given values of epsilon, delta, and maxN.
 #' @seealso [interpolate_scb()] is the main wrapper for interpolation on a list.
 #' @export
+#' @importFrom pbapply pblapply
 interpolate_scb <- function(data_list,
                              delta_interp_fun = c("logis","logis5","logis4","declin"),
                              epsilon_interp_fun = c("gompertz","exp_plateau","weibull","quad_plateau"),
@@ -161,8 +162,7 @@ interpolate_scb <- function(data_list,
 #'
 #' @param x An object of class `"empirical_scb_list"` containing extrapolated SCB values.
 #' @param truedata A bootstrapped list of benchmark simulations, each of class `"scb_data"`.
-#' @param alpha Numeric between 0 and 1. Significance level used to compute bootstrap confidence intervals.
-#' @param initial Integer. The size of the initial training subsample used in estimation.
+#' @param alpha Numeric between 0 and 1. Significance level used to compute bootstrap confidence intervals (default: `0.05`).
 #' @param plot_type Character string. Determines which SCB to plot: `"Delta"` (default) or `"Epsilon"`.
 #' @param include_legend Logical. Whether to display a legend (default: `TRUE`).
 #' @param include_title Logical. Whether to include a title (default: `TRUE`).
@@ -175,8 +175,7 @@ interpolate_scb <- function(data_list,
 
 plot.empirical_scb_list <- function(x,
                                truedata,
-                               alpha,
-                               initial,
+                               alpha=0.05,
                                plot_type = c("Delta","Epsilon"),
                                include_legend=TRUE,
                                include_title=TRUE){
@@ -185,7 +184,7 @@ plot.empirical_scb_list <- function(x,
   delta <- x[[1]]$delta
   maxN <- x[[1]]$maxN
 
-  interp <- bind_rows(lapply(x, function(y) y$interpolated)) %>%
+  interp <- bind_rows(lapply(x, `[[`, "interpolated")) %>%
     group_by(N) %>%
     summarise(
       CI_Upper_Delta = quantile(Fit_Delta, 1 - alpha / 2, na.rm = TRUE),
@@ -261,12 +260,12 @@ plot.empirical_scb_list <- function(x,
       geom_ribbon(data = truedata, aes(x = N, ymin = CI_Lower_Delta, ymax = CI_Upper_Delta), fill = "#D55E00", alpha = 0.3) +
       geom_hline(yintercept = delta, linetype = "dashed", color = "red") +
       geom_vline(xintercept = scb_value_delta, linetype = "dotted", color = "darkgreen") +
-      geom_vline(xintercept = initial, linetype = "solid", color = "black") +
+      geom_vline(xintercept = maxN, linetype = "solid", color = "black") +
       annotate("text", x = scb_value_delta - 100, y = 0.1,
                label = paste("SCB ≈", scb_value_delta, "\n(", scb_status_delta, ")"),
                color = "darkgreen", size = 4.5, hjust = 0) +
-      annotate("text", x = initial + 100, y = 0.5,
-               label = paste("Initial Subsample =", initial),
+      annotate("text", x = maxN + 100, y = 0.5,
+               label = paste("Initial Subsample =", maxN),
                color = "black", size = 4.5, hjust = 0) +
       scale_color_manual(values = c("Observed" = "blue", "Extrapolated" = "darkorange"))
 
@@ -280,12 +279,12 @@ plot.empirical_scb_list <- function(x,
       geom_ribbon(data = truedata, aes(x = N, ymin = CI_Lower_Epsilon, ymax = CI_Upper_Epsilon), fill = "#D55E00", alpha = 0.3) +
       geom_hline(yintercept = epsilon, linetype = "dashed", color = "red") +
       geom_vline(xintercept = scb_value_epsilon, linetype = "dotted", color = "darkgreen") +
-      geom_vline(xintercept = initial, linetype = "solid", color = "black") +
+      geom_vline(xintercept = maxN, linetype = "solid", color = "black") +
       annotate("text", x = scb_value_epsilon - 100, y = 0.1,
                label = paste("SCB ≈", scb_value_epsilon, "\n(", scb_status_epsilon, ")"),
                color = "darkgreen", size = 4.5, hjust = 0) +
-      annotate("text", x = initial + 100, y = 0.5,
-               label = paste("Initial Subsample =", initial),
+      annotate("text", x = maxN + 100, y = 0.5,
+               label = paste("Initial Subsample =", maxN),
                color = "black", size = 4.5, hjust = 0) +
       scale_color_manual(values = c("Observed" = "blue", "Extrapolated" = "darkorange"))
 
@@ -302,9 +301,7 @@ plot.empirical_scb_list <- function(x,
 #' 3. an upper bound on the crossing (the smallest \(N\) at which the *upper* CI envelope crosses).
 #'
 #' @param object An object of class \code{"empirical_scb_list"} containing bootstrap replicates.
-#' @param truedata (ignored) Kept for signature consistency.
-#' @param alpha Numeric in \((0,1)\).  Two‑sided CI level for the envelope (e.g.\ 0.05 for 95%).
-#' @param initial Integer.  The size of the initial subsample used.
+#' @param alpha Numeric in \((0,1)\).  Two‑sided CI level for the envelope (default: 0.05 for 95%).
 #' @param ... Additional args (ignored).
 #'
 #' @return Invisibly, a list of components
@@ -319,9 +316,11 @@ plot.empirical_scb_list <- function(x,
 #'   \item{\code{initial}}{The initial subsample size.}
 #' }
 #' @seealso \code{\link{plot.empirical_scb_list}}, \code{\link{getpac}}
+#' @import dplyr
+#' @import stats
 #' @export
 #' @method summary empirical_scb_list
-summary.empirical_scb_list <- function(object, truedata, alpha, initial, ...) {
+summary.empirical_scb_list <- function(object, alpha=0.05, ...) {
   # pull targets and maxN
   delta   <- object[[1]]$delta
   epsilon <- object[[1]]$epsilon
@@ -360,7 +359,7 @@ summary.empirical_scb_list <- function(object, truedata, alpha, initial, ...) {
                    CI_lower_N = eps_lowN,
                    CI_upper_N = eps_highN),
     alpha   = alpha,
-    initial = initial
+    initial = maxN
   )
   class(out) <- "summary_empirical_scb_list"
   invisible(out)
@@ -468,26 +467,26 @@ create_scb_prediction <- function(predict_fun,
                              transform_fn = identity,
                              arg_map = list(m = "m",
                                             newdata = "newdata")) {
-    if (is.null(arg_map$m) || is.null(arg_map$newdata)) {
-      stop("When split = TRUE, 'arg_map' must include mappings for 'm' and 'newdata'.")
+  if (is.null(arg_map$m) || is.null(arg_map$newdata)) {
+    stop("When split = TRUE, 'arg_map' must include mappings for 'm' and 'newdata'.")
+  }
+  function(m, newdata,...) {
+    if (missing(m) || missing(newdata)) {
+      stop("Both 'm' and 'newdata' must be supplied to the wrapper.")
     }
-    function(m, newdata,...) {
-      if (missing(m) || missing(newdata)) {
-        stop("Both 'm' and 'newdata' must be supplied to the wrapper.")
-      }
-      wrapper_args <- list(...)
-      mapped <- list()
-      mapped[[ arg_map$m ]] <- m
-      mapped[[ arg_map$newdata ]] <- newdata
-      all_args <- c(mapped,
-                    extra_args,
-                    wrapper_args[!names(wrapper_args) %in% names(arg_map)])
-      out <- do.call(predict_fun,all_args)
-      out <- factor(transform_fn(out), levels = c("0", "1")) #Important - must specify levels to account for possibility of all observations being classified into the same class in smaller samples
-      return(out)
-    }
+    wrapper_args <- list(...)
+    mapped <- list()
+    mapped[[ arg_map$m ]] <- m
+    mapped[[ arg_map$newdata ]] <- newdata
+    all_args <- c(mapped,
+                  extra_args,
+                  wrapper_args[!names(wrapper_args) %in% names(arg_map)])
+    out <- do.call(predict_fun,all_args)
+    out <- factor(transform_fn(out), levels = c("0", "1")) #Important - must specify levels to account for possibility of all observations being classified into the same class in smaller samples
+    return(out)
   }
 }
+
 
 
 #' Utility function to generate data points for estimation of the VC Dimension of a user-specified binary classification algorithm given a specified sample size.

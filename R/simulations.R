@@ -167,15 +167,6 @@ acc_sim <- function(n, method, p, dat, model, eta, nsample, outcome, power, effe
 #' return(out)
 #' }
 #' \donttest{
-#' library(parallel)
-#'   results <- estimate_accuracy(two_year_recid ~
-#'     race + sex + age + juv_fel_count + juv_misd_count + priors_count +
-#'     charge_degree..misd.fel.,mylogit,br,
-#'     predictfn = mypred,
-#'     nsample=10,
-#'     steps=1000,
-#'     coreoffset = (detectCores() -2)
-#'   )
 #' }
 #' @export
 
@@ -301,7 +292,7 @@ estimate_accuracy <- function(formula,
                                                        Delta = mean((1-accuracy) > epsilon,na.rm=T),
                                                        Epsilon = quantile((1-accuracy),(1-delta),na.rm=T),
                                                        Power = mean(pwr,na.rm=T))
-    out[[i]] <- list("Raw"=results,"Summary"=summtable))
+    out[[i]] <- list("Raw"=results,"Summary"=summtable)
     class(out[[i]]) <- "scb_data"
   }
   if(length(out)>1) {class(out) <- "scb_list"}
@@ -332,15 +323,6 @@ estimate_accuracy <- function(formula,
 #' return(out)
 #' }
 #' \donttest{
-#' library(parallel)
-#' results <- estimate_accuracy(two_year_recid ~ race +
-#'     sex + age + juv_fel_count + juv_misd_count + priors_count +
-#'     charge_degree..misd.fel.,mylogit,br,predictfn = mypred,
-#'     nsample=10,
-#'     steps=1000,
-#'     coreoffset = (detectCores() -2))
-#' resultsalt <- getpac(results,epsilon=0.5,delta=0.3)
-#' print(resultsalt$Summary)
 #' }
 #' @export
 getpac <- function(table,epsilon=0.05,delta=0.05){
@@ -373,30 +355,6 @@ getpac <- function(table,epsilon=0.05,delta=0.05){
 #' @importFrom plotly plot_ly layout
 #' @examples
 #' \donttest{
-#' library(parallel)
-#' mylogit <- function(formula, data){
-#'   m <- structure(
-#'     glm(formula = formula, data = data, family = binomial(link = "logit")),
-#'     class = c("svrclass", "glm")
-#'   )
-#'   return(m)
-#' }
-#'
-#' mypred <- function(m, newdata){
-#'   out <- predict.glm(m, newdata, type = "response")
-#'   out <- factor(ifelse(out > 0.5, 1, 0), levels = c("0", "1"))
-#'   return(out)
-#' }
-#'
-#' results <- estimate_accuracy(two_year_recid ~ race + sex + age +
-#'       juv_fel_count + juv_misd_count + priors_count +
-#'       charge_degree..misd.fel., mylogit, br, predictfn = mypred,
-#'     nsample = 10,
-#'     steps = 1000,
-#'     coreoffset = (detectCores() - 2))
-#'
-#' fig <- plot(results, letters = "latin")
-#' fig
 #' }
 #' @export
 #' @method plot scb_data
