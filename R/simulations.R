@@ -127,6 +127,8 @@ acc_sim <- function(n, method, p, dat, model, eta, nsample, outcome, power, effe
 #' @param delta A real number between 0 and 1 giving the targeted maximum probability of observing an OOS error rate higher than `epsilon`
 #' @param epsilon A real number between 0 and 1 giving the targeted maximum out-of-sample (OOS) error rate
 #' @param predictfn An optional user-defined function giving a custom predict method. If also using a user-defined model, the `model` should output an object of class `"svrclass"` to avoid errors.
+#' @param subsample_size An integer giving the size of the initial 'pilot' sample to be simulated. If left as NULL, the input data size will be used (benchmark SCB).
+#' @param nboot An integer giving the number of SCB bootstraps to be performed.
 #' @param power A logical indicating whether experimental power based on the predictions should also be reported
 #' @param effect_size If `power` is `TRUE`, a real number indicating the scaled effect size the user would like to be able to detect.
 #' @param powersims If `power` is `TRUE`, an integer indicating the number of simulations to be conducted at each step to calculate power.
@@ -140,7 +142,7 @@ acc_sim <- function(n, method, p, dat, model, eta, nsample, outcome, power, effe
 #' @param x Optional argument for methods that take separate predictor and outcome data. Specifies a matrix-like object containing predictors. Note that if used, the x and y objects are bound together columnwise; this must be handled in the user-supplied helper function.
 #' @param y Optional argument for methods that take separate predictor and outcome data. Specifies a vector-like object containing outcome values. Note that if used, the x and y objects are bound together columnwise; this must be handled in the user-supplied helper function.
 #' @param backend One of the parallel backends used by [future::plan()]. See function documentation for more details.
-#' @param replacement A logical flag indicating whether sampling should be performed with replacement.
+#' @param replacement A logical flag indicating whether sampling should be performed with replacement.function.
 #' @param ... Additional arguments that need to be passed to `model`
 #' @return A `list` containing two named elements. `Raw` gives the exact output of the simulations, while `Summary` gives a table of accuracy metrics, including the achieved levels of \eqn{\epsilon} and \eqn{\delta} given the specified values. Alternative values can be calculated using [getpac()]
 #' @seealso [plot_accuracy()], to represent simulations visually, [getpac()], to calculate summaries for alternate values of \eqn{\epsilon} and \eqn{\delta} without conducting a new simulation, and [gendata()], to generated synthetic datasets.
@@ -178,7 +180,37 @@ acc_sim <- function(n, method, p, dat, model, eta, nsample, outcome, power, effe
 #' @export
 
 
-estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,sparse=FALSE,density=NULL,upperlimit=NULL,nsample= 30, steps= 50,eta=0.05,delta=0.05,epsilon=0.05,predictfn = NULL,power = FALSE,effect_size=NULL,powersims=NULL,alpha=0.05,parallel = TRUE,coreoffset=0,packages=list(),method = c("Uniform","Class Imbalance"),p=NULL,minn = ifelse(is.null(data),ifelse(is.null(x),(dim+1),(ncol(x)+1)),(ncol(data)+1)),x=NULL,y=NULL,backend = c("multisession","multicore","cluster","sequential"),replacement=TRUE,...){
+estimate_accuracy <- function(formula,
+                              model,
+                              data=NULL,
+                              dim=NULL,
+                              maxn=NULL,
+                              sparse=FALSE,
+                              density=NULL,
+                              upperlimit=NULL,
+                              nsample= 30,
+                              steps= 50,
+                              eta=0.05,
+                              delta=0.05,
+                              epsilon=0.05,
+                              predictfn = NULL,
+                              subsample_size = NULL,
+                              nboot = 1L,
+                              power = FALSE,
+                              effect_size=NULL,
+                              powersims=NULL,
+                              alpha=0.05,
+                              parallel = TRUE,
+                              coreoffset=0,
+                              packages=list(),
+                              method = c("Uniform","Class Imbalance"),
+                              p=NULL,
+                              minn = ifelse(is.null(data),ifelse(is.null(x),(dim+1),(ncol(x)+1)),(ncol(data)+1)),
+                              x=NULL,
+                              y=NULL,
+                              backend = c("multisession","multicore","cluster","sequential"),
+                              replacement=TRUE,
+                              ...){
   force(minn)
   split <- FALSE
   backend <- match.arg(backend)
@@ -210,6 +242,12 @@ estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,spars
   } else{
     dat <- model.frame(formula,data)
   }
+  if(!is.null(subsample_size)){
+    ind <- sample(seq_len(nrow(data)), subsample_size, replace = F)
+  } else{
+    ind <- sample(seq_len(nrow(data)), nrow(data), replace = F)
+  }
+  data <- data[ind, , drop = FALSE]
   method <- match.arg(method)
   results <- list()
   outcome <- all.vars(formula)[1]
@@ -252,16 +290,22 @@ estimate_accuracy <- function(formula, model,data=NULL, dim=NULL,maxn=NULL,spars
     r <- acc_sim(n=x,method=method,p=p,dat=dat,model=model,eta=eta,nsample=nsample,outcome=outcome,power=power,effect_size=effect_size,powersims=powersims,alpha=alpha,split=split,predictfn=predictfn,replacement=replacement,...)
     return(r)
   }
-  results <- future_map(nvalues, temp,method=method,p=p,dat=dat,model=model,eta=eta,nsample=nsample,outcome=outcome,power=power,effect_size=effect_size,powersims=powersims,alpha=alpha,split=split,predictfn=predictfn,replacement=replacement,...,.options = furrr_options(seed = TRUE))
-  results <- bind_rows(results)
-  summtable <- results %>% group_by(n) %>% summarise(Accuracy = mean(accuracy,na.rm=T),
-                                                     Precision = mean(prec,na.rm=T),
-                                                     Recall = mean(rec,na.rm=T),
-                                                     Fscore = mean(fscore,na.rm=T),
-                                                     Delta = mean((1-accuracy) > epsilon,na.rm=T),
-                                                     Epsilon = quantile((1-accuracy),(1-delta),na.rm=T),
-                                                     Power = mean(pwr,na.rm=T))
-  return(list("Raw"=results,"Summary"=summtable))
+  out <- vector("list",nboot)
+  for(i in seq_len(nboot)){
+    results <- future_map(nvalues, temp,method=method,p=p,dat=dat,model=model,eta=eta,nsample=nsample,outcome=outcome,power=power,effect_size=effect_size,powersims=powersims,alpha=alpha,split=split,predictfn=predictfn,replacement=replacement,...,.options = furrr_options(seed = TRUE))
+    results <- bind_rows(results)
+    summtable <- results %>% group_by(n) %>% summarise(Accuracy = mean(accuracy,na.rm=T),
+                                                       Precision = mean(prec,na.rm=T),
+                                                       Recall = mean(rec,na.rm=T),
+                                                       Fscore = mean(fscore,na.rm=T),
+                                                       Delta = mean((1-accuracy) > epsilon,na.rm=T),
+                                                       Epsilon = quantile((1-accuracy),(1-delta),na.rm=T),
+                                                       Power = mean(pwr,na.rm=T))
+    out[[i]] <- list("Raw"=results,"Summary"=summtable))
+    class(out[[i]]) <- "scb_data"
+  }
+  if(length(out)>1) {class(out) <- "scb_list"}
+  if(nboot==1L) return(out[[1]]) else return(out)
 }
 #' Recalculate achieved sample complexity bounds given different parameter inputs
 #'
@@ -308,51 +352,62 @@ getpac <- function(table,epsilon=0.05,delta=0.05){
                                                      Delta = mean((1-accuracy) > (epsilon),na.rm=T),
                                                      Epsilon = quantile((1-accuracy),(1-delta),na.rm=T),
                                                      Power = mean(pwr,na.rm=T))
-  return(list("Raw"=results,"Summary"=summtable))
+  out <- list("Raw"=results,"Summary"=summtable)
+  class(out) <- "scb_data"
+  return(out)
 }
-#' Represent simulated sample complexity bounds graphically
+#' Plot method for simulated sample complexity bounds (`scb_data` object)
 #'
-#' @param table A list containing an element named `Raw`. Should always be used with the output of [estimate_accuracy()]
-#' @param metrics A character vector containing the metrics to display in the plot. Can be any of "Accuracy", "Precision", "Recall", "Fscore", "delta", "epsilon"
-#' @param plottype A string giving the graphics package to be used to generate the plot. Can be one of "ggplot" or "plotly"
-#' @param letters A string determining whether delta and epsilon should be given as greek letters in the plot legend. Defaults to Greek lettering but available in case of rendering issues.
-#' @return Either a \link[ggplot2]{ggplot} or \link[plotly]{plot_ly} plot object, depending on the chosen option of `plottype`.
-#' @seealso [estimate_accuracy()], to generate estimated sample complexity bounds.
+#' This method plots performance metrics estimated using [estimate_accuracy()] for objects of class `"scb_data"`.
+#'
+#' @param x An object of class `"scb_data"`, typically the output of [estimate_accuracy()]
+#' @param metrics A character vector containing the metrics to display in the plot. Can include any of "Accuracy", "Precision", "Recall", "Fscore", "Delta", "Epsilon", "Power".
+#' @param plottype A string indicating the graphics system to use. Must be either `"ggplot"` or `"plotly"`.
+#' @param letters A string specifying whether `"Delta"` and `"Epsilon"` should appear as Greek letters (`"greek"`) or Latin (`"latin"`) in the legend. Defaults to `"greek"`.
+#'
+#' @return A \link[ggplot2]{ggplot} or \link[plotly]{plot_ly} object, depending on the value of `plottype`.
+#' @seealso [estimate_accuracy()], which generates the data used for plotting.
 #' @importFrom tidyr pivot_longer
 #' @import dplyr
 #' @importFrom ggplot2 ggplot aes geom_line
 #' @importFrom plotly plot_ly layout
 #' @examples
-#' mylogit <- function(formula, data){
-#' m <- structure(
-#'   glm(formula=formula,data=data,family=binomial(link="logit")),
-#'   class=c("svrclass","glm")  #IMPORTANT - must use the class svrclass to work correctly
-#' )
-#' return(m)
-#' }
-#' mypred <- function(m,newdata){
-#' out <- predict.glm(m,newdata,type="response")
-#' out <- factor(ifelse(out>0.5,1,0),levels=c("0","1"))
-#' #Important - must specify levels to account for possibility of all
-#' #observations being classified into the same class in smaller samples
-#' return(out)
-#' }
 #' \donttest{
 #' library(parallel)
+#' mylogit <- function(formula, data){
+#'   m <- structure(
+#'     glm(formula = formula, data = data, family = binomial(link = "logit")),
+#'     class = c("svrclass", "glm")
+#'   )
+#'   return(m)
+#' }
+#'
+#' mypred <- function(m, newdata){
+#'   out <- predict.glm(m, newdata, type = "response")
+#'   out <- factor(ifelse(out > 0.5, 1, 0), levels = c("0", "1"))
+#'   return(out)
+#' }
+#'
 #' results <- estimate_accuracy(two_year_recid ~ race + sex + age +
 #'       juv_fel_count + juv_misd_count + priors_count +
-#'       charge_degree..misd.fel.,mylogit,br,predictfn = mypred,
-#'     nsample=10,
-#'     steps=1000,
-#'     coreoffset = (detectCores() -2))
+#'       charge_degree..misd.fel., mylogit, br, predictfn = mypred,
+#'     nsample = 10,
+#'     steps = 1000,
+#'     coreoffset = (detectCores() - 2))
 #'
-#' fig <- plot_accuracy(results,letters="latin")
+#' fig <- plot(results, letters = "latin")
 #' fig
 #' }
 #' @export
-plot_accuracy <- function(table,metrics=c("Accuracy","Precision","Recall","Fscore","Delta","Epsilon","Power"),plottype = c("ggplot","plotly"),letters = c("greek","latin")){
+#' @method plot scb_data
+
+
+plot.scb_data <- function(x,
+                          metrics = c("Accuracy", "Precision", "Recall", "Fscore", "Delta", "Epsilon", "Power"),
+                          plottype = c("ggplot", "plotly"),
+                          letters = c("greek", "latin")){
   letters <- match.arg(letters)
-  toplot <- table$Summary %>%
+  toplot <- x$Summary %>%
    select(n,all_of(metrics)) %>%
       pivot_longer(cols=Accuracy:Power,names_to = "Metric",values_to = "Value")
   if(("Delta" %in% metrics) & (letters == "greek")){
@@ -371,7 +426,6 @@ plot_accuracy <- function(table,metrics=c("Accuracy","Precision","Recall","Fscor
     simpleError("Invalid Plot Type")
   }
   return(plot)
-
 }
 
 
